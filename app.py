@@ -104,7 +104,7 @@ if __name__ == "__main__":
     print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer")
     print(f"  Local:    http://localhost:{args.port}")
     print(f"  Network:  http://{local_ip}:{args.port}\n")
-    app.run(host=args.host, port=args.port, debug=args.debug)
+    app.run(host=args.host, port=args.port, debug=True)
 
 
 # ─── GITHUB WEBHOOK (auto-deploy on push) ─────────────────────────────────────
