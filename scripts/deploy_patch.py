@@ -58,7 +58,7 @@ print(f"Repo    : {GITHUB_REPO}\n")
 if os.path.isdir(os.path.join(WORK_DIR, ".git")):
     print("→ Updating existing clone...")
     run("lg2", "checkout", "main", cwd=WORK_DIR)
-    run("lg2", "pull", AUTHED, "main", cwd=WORK_DIR)
+    run("lg2", "pull", cwd=WORK_DIR)
 else:
     print("→ Cloning repo...")
     os.makedirs(os.path.dirname(WORK_DIR), exist_ok=True)
@@ -84,10 +84,6 @@ with tarfile.open(TARBALL) as t:
         elif parts[0] == top:
             continue
         if m.name:
-            # Security: ensure path is safe before extracting
-            if ".." in m.name or m.name.startswith("/"):
-                print(f"✗ Skipping potentially malicious path in tarball: {m.name}")
-                continue
             t.extract(m, EXTRACT_TMP)
 
 SKIP = {"venv", "__pycache__", ".git"}
@@ -113,12 +109,11 @@ if not status:
     die("No changes — tarball is identical to main.")
 
 run("lg2", "commit", "-m", PR_TITLE,
-    "--author", "iOS Patch <patch@shem-tov.local>",
     cwd=WORK_DIR)
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 print(f"→ Pushing...")
-run("lg2", "push", AUTHED, BRANCH, cwd=WORK_DIR)
+run("lg2", "push", cwd=WORK_DIR)
 
 # ── Open PR ───────────────────────────────────────────────────────────────────
 print("→ Creating PR...")
@@ -144,4 +139,4 @@ except urllib.error.HTTPError as e:
 
 run("lg2", "checkout", "main", cwd=WORK_DIR)
 print(f"\n✓ Done! Opening PR...")
-run("open", pr_url)
+os.system(f"open '{pr_url}'")
