@@ -95,7 +95,7 @@ def index(): return render_template("index.html")
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--host", default="0.0.0.0")
-    p.add_argument("--port", type=int, default=5000)
+    p.add_argument("--port", type=int, default=5003)
     p.add_argument("--debug", action="store_true")
     args = p.parse_args()
     init_db()
