@@ -175,6 +175,10 @@ def apply_patch():
                 elif parts[0] == top:
                     continue
                 if m.name:
+                    # Security: ensure path is safe before extracting
+                    if ".." in m.name or os.path.isabs(m.name):
+                        app.logger.warning(f"Skipping potentially malicious path in tarball: {m.name}")
+                        continue
                     t.extract(m, extract_dir)
 
         # Run the make_pr.sh script
