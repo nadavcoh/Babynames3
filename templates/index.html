@@ -250,7 +250,10 @@ async function init(){
   ]);
   RAW = await namesRes.json();
   const state = await stateRes.json();
-  liked   = state.liked  || [];
+  // Build lookup map so we can restore full objects from saved name strings
+  const nameMap = {};
+  RAW.forEach(function(n){ nameMap[n.h] = n; });
+  liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
   skipped = new Set(state.skipped || []);
 
   document.getElementById("loading").classList.add("hide");

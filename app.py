@@ -40,11 +40,7 @@ def github_webhook():
             ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:],
         )
 
-    # Inspect webhook response for debugging and logging
-    payload = request.get_json()  # Log the payload for debugging purposes
-    print("Received payload:", json.dumps(payload, indent=2))
     threading.Thread(target=do_deploy, daemon=True).start()
-
     return jsonify({"ok": True, "action": "deploying"})
  
 # ─── DATABASE FUNCTIONS ───
@@ -127,8 +123,9 @@ def get_names():
                     headers={"Cache-Control": "public, max-age=86400"})
 
 # ─── SERVE ───
-@app.route("/static/\x03cpath:path\x0e")
+@app.route("/static/<path:path>")
 def static_files(path): return send_from_directory("static", path)
+
 @app.route("/")
 def index(): return render_template("index.html")
 
@@ -144,4 +141,4 @@ if __name__ == "__main__":
     print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer")
     print(f"  Local:    http://localhost:{args.port}")
     print(f"  Network:  http://{local_ip}:{args.port}\n")
-    app.run(host=args.host, port=args.port, debug=True)
+    app.run(host=args.host, port=args.port, debug=args.debug)
