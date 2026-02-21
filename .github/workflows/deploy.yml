@@ -19,7 +19,7 @@ jobs:
       - name: Trigger Deployment Webhook and Inspect Response
         id: deployment-step
         run: |
-          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json, X-GitHub-Event: push" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook)
+          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -H "X-GitHub-Event: push" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook)
           echo "HTTP Response: $RESPONSE"
           cat response.json
           if [ "$RESPONSE" -ne 200 ]; then
