@@ -17,4 +17,4 @@ jobs:
           tags: tag:github-actions
 
       - name: Trigger Deployment Webhook
-        run: curl -X GET http://hamusim.puma-kettle.ts.net:5003/webhook
+        run: curl -X POST -H "Content-Type: application/json" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook
