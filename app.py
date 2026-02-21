@@ -37,7 +37,7 @@ def github_webhook():
         )
         os.execv(
             python_executable,
-            [os.path.join(app_dir, "app.py")] + sys.argv[1:],
+            ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:],
         )
 
     # Inspect webhook response for debugging and logging
