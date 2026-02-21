@@ -16,5 +16,13 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:github-actions
 
-      - name: Trigger Deployment Webhook
-        run: "curl -X POST -H \"Content-Type: application/json\" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook"
+      - name: Trigger Deployment Webhook and Inspect Response
+        id: deployment-step
+        run: |
+          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook)
+          echo "HTTP Response: $RESPONSE"
+          cat response.json
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "Deployment failed. Server returned status code $RESPONSE" >&2
+            exit 1
+          fi
