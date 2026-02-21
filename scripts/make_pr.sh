@@ -10,7 +10,19 @@ set -euo pipefail
 EXTRACT_DIR="$1"
 BRANCH="$2"
 PR_TITLE="$3"
-GITHUB_TOKEN="$4"
+#!/usr/bin/env bash
+# make_pr.sh — called by Flask /api/patch
+# Usage: make_pr.sh <extract_dir> <branch> <pr_title> <github_repo> <app_dir>
+#
+# Copies files from extract_dir into the app, creates a branch, pushes, opens a PR.
+# Prints the PR URL as the last line of stdout.
+
+set -euo pipefail
+
+EXTRACT_DIR="$1"
+BRANCH="$2"
+PR_TITLE="$3"
+GITHUB_REPO="$4"  # e.g. nadavcoh/Babynames3
 GITHUB_REPO="$5"  # e.g. nadavcoh/Babynames3
 APP_DIR="$6"
 
