@@ -203,6 +203,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <div class="dm" id="dm">
   <div class="ds2" id="ds2"><div id="dc"></div></div>
 </div>
+<div id="offline-ind" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:#1a1208;color:#f7f3ee;font-size:.78rem;font-weight:600;padding:8px 16px;align-items:center;justify-content:center;gap:8px;"></div>
 <div id="toast"></div>
 
 <script>
@@ -223,12 +224,52 @@ function clrFor(c){return (CC[c]||CC.classic).co}
 function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
 // ── API helpers ──────────────────────────────────────────────────────────────
+// ── Offline support ─────────────────────────────────────────────────────────
+let pendingSave = false;
+
+function updateOnlineStatus(){
+  const ind = document.getElementById("offline-ind");
+  if(!ind) return;
+  const offline = !navigator.onLine || pendingSave;
+  ind.style.display = offline ? "flex" : "none";
+  ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
+                                       : "⏫ Syncing to server…";
+}
+
+async function flushPending(){
+  const body = localStorage.getItem("pending-state");
+  if(body){
+    try{
+      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      localStorage.removeItem("pending-state");
+    }catch(e){ return; } // still offline
+  }
+  const sprefs = localStorage.getItem("pending-settings");
+  if(sprefs){
+    try{
+      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
+      localStorage.removeItem("pending-settings");
+    }catch(e){ return; }
+  }
+  pendingSave = false;
+  updateOnlineStatus();
+  showToast("✓ Back online — changes synced");
+}
+
+window.addEventListener("online",  function(){ updateOnlineStatus(); flushPending(); });
+window.addEventListener("offline", function(){ updateOnlineStatus(); });
+
 function saveState(){
-  try{
-    fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)})
+  const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
+  if(!navigator.onLine){
+    try{ localStorage.setItem("pending-state", body); }catch(e){}
+    pendingSave = true; updateOnlineStatus(); return;
+  }
+  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .catch(function(){
+      try{ localStorage.setItem("pending-state", body); }catch(e){}
+      pendingSave = true; updateOnlineStatus();
     });
-  }catch(e){console.warn("save failed",e)}
 }
 async function apiClear(){
   try{await fetch("/api/state",{method:"DELETE"})}catch(e){}
@@ -559,15 +600,18 @@ async function loadSettings(){
     SETTINGS = await res.json();
   }catch(e){ SETTINGS = {}; }
   applySettings();
+  buildDeck(); // rebuild deck with loaded settings
 }
 
 async function saveSettings(){
-  try{
-    await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
-    showToast("Settings saved");
-  }catch(e){ showToast("Save failed"); }
   applySettings();
   buildDeck();
+  try{
+    await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
+  }catch(e){
+    try{ localStorage.setItem("pending-settings", JSON.stringify(SETTINGS)); }catch(e2){}
+    pendingSave=true; updateOnlineStatus();
+  }
 }
 
 function applySettings(){
@@ -657,6 +701,8 @@ init = async function(){
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("/static/sw.js").catch(function(){});
   }
+  updateOnlineStatus();
+  if(pendingSave && navigator.onLine) flushPending();
 };
 
 </script>
