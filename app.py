@@ -7,6 +7,42 @@ from flask import Flask, request, jsonify, render_template, g, send_from_directo
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "shem_tov.db")
 
+# ─── GITHUB WEBHOOK (auto-deploy on push) ─────────────────────────────────────
+import hmac, hashlib, subprocess, threading
+
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+
+@app.route("/webhook", methods=["POST"])
+def github_webhook():
+    # Verify signature
+    if WEBHOOK_SECRET:
+        sig = request.headers.get("X-Hub-Signature-256", "")
+        expected = "sha256=" + hmac.new(WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return jsonify({"error": "bad signature"}), 403
+
+    # Only act on push events
+    if request.headers.get("X-GitHub-Event") != "push":
+        return jsonify({"ok": True, "action": "ignored"})
+
+    def do_deploy():
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        subprocess.run(["git", "-C", app_dir, "pull"], check=True)
+        # Trigger graceful restart via touching a file (for use with a process manager)
+        # or just exit — systemd/supervisor will restart us
+        os.execv(
+            os.path.join(app_dir, "venv", "bin", "python"),
+            ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:]
+        )
+
+    # Inspect webhook response for debugging and logging
+    payload = request.get_json()  # Log the payload for debugging purposes
+    print("Received payload:", json.dumps(payload, indent=2))
+    threading.Thread(target=do_deploy, daemon=True).start()
+
+    return jsonify({"ok": True, "action": "deploying"})
+ 
+# ─── DATABASE FUNCTIONS ───
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DB_PATH)
@@ -86,9 +122,8 @@ def get_names():
                     headers={"Cache-Control": "public, max-age=86400"})
 
 # ─── SERVE ───
-@app.route("/static/<path:path>")
+@app.route("/static/\x03cpath:path\x0e")
 def static_files(path): return send_from_directory("static", path)
-
 @app.route("/")
 def index(): return render_template("index.html")
 
@@ -105,35 +140,3 @@ if __name__ == "__main__":
     print(f"  Local:    http://localhost:{args.port}")
     print(f"  Network:  http://{local_ip}:{args.port}\n")
     app.run(host=args.host, port=args.port, debug=True)
-
-
-# ─── GITHUB WEBHOOK (auto-deploy on push) ─────────────────────────────────────
-import hmac, hashlib, subprocess, threading
-
-WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
-
-@app.route("/webhook", methods=["POST"])
-def github_webhook():
-    # Verify signature
-    if WEBHOOK_SECRET:
-        sig = request.headers.get("X-Hub-Signature-256", "")
-        expected = "sha256=" + hmac.new(WEBHOOK_SECRET.encode(), request.data, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected):
-            return jsonify({"error": "bad signature"}), 403
-
-    # Only act on push events
-    if request.headers.get("X-GitHub-Event") != "push":
-        return jsonify({"ok": True, "action": "ignored"})
-
-    def do_deploy():
-        app_dir = os.path.dirname(os.path.abspath(__file__))
-        subprocess.run(["git", "-C", app_dir, "pull"], check=True)
-        # Trigger graceful restart via touching a file (for use with a process manager)
-        # or just exit — systemd/supervisor will restart us
-        os.execv(
-            os.path.join(app_dir, "venv", "bin", "python"),
-            ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:]
-        )
-
-    threading.Thread(target=do_deploy, daemon=True).start()
-    return jsonify({"ok": True, "action": "deploying"})
