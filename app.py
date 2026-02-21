@@ -30,9 +30,14 @@ def github_webhook():
         subprocess.run(["git", "-C", app_dir, "pull"], check=True)
         # Trigger graceful restart via touching a file (for use with a process manager)
         # or just exit — systemd/supervisor will restart us
+        python_executable = (
+            os.path.join(app_dir, "venv", "Scripts", "python.exe")
+            if sys.platform == "win32"
+            else os.path.join(app_dir, "venv", "bin", "python")
+        )
         os.execv(
-            os.path.join(app_dir, "venv", "bin", "python"),
-            [os.path.join(app_dir, "app.py")] + sys.argv[1:]
+            python_executable,
+            [os.path.join(app_dir, "app.py")] + sys.argv[1:],
         )
 
     # Inspect webhook response for debugging and logging
