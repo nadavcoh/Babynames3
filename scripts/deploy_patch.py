@@ -139,4 +139,4 @@ except urllib.error.HTTPError as e:
 
 run("lg2", "checkout", "main", cwd=WORK_DIR)
 print(f"\n✓ Done! Opening PR...")
-os.system(f"open '{pr_url}'")
+run("open", pr_url)
