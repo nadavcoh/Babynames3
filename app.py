@@ -132,6 +132,68 @@ def get_names():
     return Response(data, mimetype="application/json",
                     headers={"Cache-Control": "public, max-age=86400"})
 
+
+# ─── PATCH / PR ENDPOINT ──────────────────────────────────────────────────────
+@app.route("/api/patch", methods=["POST"])
+def apply_patch():
+    """
+    Receive a .tar.gz from iOS Shortcut, extract it, create a branch, push, open PR.
+    Requires env vars: GITHUB_TOKEN, GITHUB_REPO (e.g. nadavcoh/Babynames3)
+    Headers: X-Branch-Name (optional, defaults to patch/TIMESTAMP)
+    """
+    import tempfile, tarfile, shutil, time
+    from datetime import datetime
+
+    token = os.environ.get("GITHUB_TOKEN", "")
+    repo  = os.environ.get("GITHUB_REPO", "")
+    if not token or not repo:
+        return jsonify({"error": "GITHUB_TOKEN and GITHUB_REPO env vars required"}), 500
+
+    app_dir    = os.path.dirname(os.path.abspath(__file__))
+    branch     = request.headers.get("X-Branch-Name") or f"patch/{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    pr_title   = request.headers.get("X-PR-Title") or f"Patch {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+    # Save the uploaded tarball to a temp file
+    tmp = tempfile.mkdtemp()
+    try:
+        tar_path = os.path.join(tmp, "patch.tar.gz")
+        request.stream.seek(0)
+        with open(tar_path, "wb") as f:
+            f.write(request.data or request.stream.read())
+
+        # Extract
+        extract_dir = os.path.join(tmp, "extracted")
+        os.makedirs(extract_dir)
+        with tarfile.open(tar_path) as t:
+            # Strip leading component (e.g. "shem_tov/") if present
+            members = t.getmembers()
+            top = members[0].name.split("/")[0] if members else ""
+            for m in members:
+                parts = m.name.split("/", 1)
+                if len(parts) > 1 and parts[0] == top:
+                    m.name = parts[1]
+                elif parts[0] == top:
+                    continue
+                if m.name:
+                    t.extract(m, extract_dir)
+
+        # Run the make_pr.sh script
+        script = os.path.join(app_dir, "scripts", "make_pr.sh")
+        result = subprocess.run(
+            ["bash", script, extract_dir, branch, pr_title, token, repo, app_dir],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode != 0:
+            return jsonify({"error": result.stderr or result.stdout}), 500
+
+        pr_url = result.stdout.strip().splitlines()[-1]  # last line is the PR URL
+        return jsonify({"ok": True, "pr_url": pr_url, "branch": branch})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
 # ─── SERVE ───
 @app.route("/static/<path:path>")
 def static_files(path): return send_from_directory("static", path)
