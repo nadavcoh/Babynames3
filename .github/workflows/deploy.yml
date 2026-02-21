@@ -1,28 +1,20 @@
-name: Deploy to dev server
-
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:github-actions
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Trigger Deployment Webhook and Inspect Response
-        id: deployment-step
-        run: |
-          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook)
-          echo "HTTP Response: $RESPONSE"
-          cat response.json
-          if [ "$RESPONSE" -ne 200 ]; then
-            echo "Deployment failed. Server returned status code $RESPONSE" >&2
-            exit 1
-          fi
+    - name: Deploy to server
+      run: echo "Deploying..."
+      env:
+        WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+        X-GitHub-Event: push
+
+    - name: Notify deployment
+      run: |
+        curl -X POST -H 'X-GitHub-Event: push' $WEBHOOK_URL
