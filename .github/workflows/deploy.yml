@@ -1,0 +1,31 @@
+name: Deploy to dev server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret:    ${{ secrets.TS_OAUTH_SECRET }}
+          tags:            tag:github-actions
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.DEV_HOST }}      # Tailscale IP or machine name
+          username: ${{ secrets.DEV_USER }}
+          password: ${{ secrets.DEV_PASSWORD }}  # or use key: below
+          # key:    ${{ secrets.DEV_SSH_KEY }}   # paste private key here instead
+          port:     22
+          script: |
+            cd C:\path\to\shem_tov
+            git pull
+            taskkill /F /IM python.exe /FI "WINDOWTITLE eq shem_tov" 2>nul
+            start "shem_tov" /B venv\Scripts\python.exe app.py --host 0.0.0.0 --port 5000

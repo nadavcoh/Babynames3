@@ -1,0 +1,15 @@
+[Unit]
+Description=שם טוב — Name Explorer
+After=network.target
+
+[Service]
+Type=simple
+# ← change this to your actual user and path
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/shem_tov
+ExecStart=/path/to/shem_tov/venv/bin/python app.py --host 0.0.0.0 --port 5000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
