@@ -32,7 +32,7 @@ def github_webhook():
         # or just exit — systemd/supervisor will restart us
         os.execv(
             os.path.join(app_dir, "venv", "bin", "python"),
-            ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:]
+            [os.path.join(app_dir, "app.py")] + sys.argv[1:]
         )
 
     # Inspect webhook response for debugging and logging
