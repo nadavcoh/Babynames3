@@ -179,9 +179,11 @@ def apply_patch():
 
         # Run the make_pr.sh script
         script = os.path.join(app_dir, "scripts", "make_pr.sh")
+        env = os.environ.copy()
+        env["GITHUB_TOKEN"] = token
         result = subprocess.run(
-            ["bash", script, extract_dir, branch, pr_title, token, repo, app_dir],
-            capture_output=True, text=True, timeout=60
+            ["bash", script, extract_dir, branch, pr_title, repo, app_dir],
+            capture_output=True, text=True, timeout=60, env=env
         )
         if result.returncode != 0:
             return jsonify({"error": result.stderr or result.stdout}), 500
