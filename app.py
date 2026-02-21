@@ -26,19 +26,29 @@ def github_webhook():
         return jsonify({"ok": True, "action": "ignored"})
 
     def do_deploy():
+        import time, platform
         app_dir = os.path.dirname(os.path.abspath(__file__))
         subprocess.run(["git", "-C", app_dir, "pull"], check=True)
-        # Trigger graceful restart via touching a file (for use with a process manager)
-        # or just exit — systemd/supervisor will restart us
-        python_executable = (
-            os.path.join(app_dir, "venv", "Scripts", "python.exe")
-            if sys.platform == "win32"
-            else os.path.join(app_dir, "venv", "bin", "python")
-        )
-        os.execv(
-            python_executable,
-            ["python", os.path.join(app_dir, "app.py")] + sys.argv[1:],
-        )
+
+        if platform.system() == "Windows":
+            # On Windows, spawn a new detached process then exit
+            python = os.path.join(app_dir, "venv", "Scripts", "python.exe")
+            if not os.path.exists(python):
+                python = sys.executable
+            subprocess.Popen(
+                [python, os.path.join(app_dir, "app.py")] + sys.argv[1:],
+                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+                close_fds=True,
+            )
+        else:
+            # On Linux/Mac, execv replaces this process in-place
+            python = os.path.join(app_dir, "venv", "bin", "python")
+            if not os.path.exists(python):
+                python = sys.executable
+            os.execv(python, [python, os.path.join(app_dir, "app.py")] + sys.argv[1:])
+
+        time.sleep(1)   # give the new process a moment to bind the port
+        os._exit(0)     # exit the old process
 
     threading.Thread(target=do_deploy, daemon=True).start()
     return jsonify({"ok": True, "action": "deploying"})
