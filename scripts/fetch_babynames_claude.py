@@ -1,7 +1,3 @@
-
-
-
-
 #!/usr/bin/env python3
 """
 fetch_babynames_claude.py
@@ -20,7 +16,7 @@ import sys
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GITHUB_URL = (
-    "https://github.com/prakharrathi25/babynames3/archive/refs/heads/master.tar.gz"
+    "https://github.com/nadavcoh/babynames3/archive/refs/heads/master.tar.gz"
 )
 DEST_DIR   = os.path.expanduser("~/Documents")
 DEST_FILE  = os.path.join(DEST_DIR, "babynames3.tar.gz")
