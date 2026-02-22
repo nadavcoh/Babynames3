@@ -53,19 +53,20 @@ def open_with_claude(filepath: str) -> None:
 
     We try the direct open first and fall back to the share sheet.
     """
-    print("\nOpening file with Claude …")
-
+#    print("\nOpening file with Claude 
+#…")
+#
     # Attempt 1: direct open (works if Claude registers the UTI)
     result = subprocess.run(
-        ["open", "-a", "Claude", filepath],
+        ["open", filepath],
         capture_output=True,
         text=True,
     )
-
+#
     if result.returncode == 0:
-        print("✓ File sent to Claude directly.")
+        print("✓ File sent to Claudedirectly.")
         return
-
+#
     # Attempt 2: iOS share sheet via a-Shell's built-in 'share' command
     print("Direct open failed – raising iOS share sheet instead …")
     result = subprocess.run(["share", filepath], capture_output=True, text=True)
