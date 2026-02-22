@@ -190,7 +190,7 @@ def apply_patch():
         return jsonify({"ok": True, "pr_url": pr_url, "branch": branch})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal error occurred while applying the patch."}), 500
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
