@@ -580,9 +580,10 @@ function saveState(){
   }
   fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
     .then(function(r){ if(!r.ok) throw new Error(r.status); })
-    .catch(function(){
+    .catch(function(e){ // Added 'e' to catch the error object
+      console.error("Error saving state to server:", e); // Log the error
       serverAvailable = false;
-      try{ localStorage.setItem("pending-state", body); }catch(e){}
+      try{ localStorage.setItem("pending-state", body); }catch(e){} // Catch inner error as well
       pendingSave = true; updateOnlineStatus();
     });
 }
