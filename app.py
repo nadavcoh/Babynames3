@@ -175,19 +175,13 @@ def apply_patch():
                 elif parts[0] == top:
                     continue
                 if m.name:
-                    # Security: ensure path is safe before extracting
-                    if ".." in m.name or os.path.isabs(m.name):
-                        app.logger.warning(f"Skipping potentially malicious path in tarball: {m.name}")
-                        continue
                     t.extract(m, extract_dir)
 
         # Run the make_pr.sh script
         script = os.path.join(app_dir, "scripts", "make_pr.sh")
-        env = os.environ.copy()
-        env["GITHUB_TOKEN"] = token
         result = subprocess.run(
-            ["bash", script, extract_dir, branch, pr_title, repo, app_dir],
-            capture_output=True, text=True, timeout=60, env=env
+            ["bash", script, extract_dir, branch, pr_title, token, repo, app_dir],
+            capture_output=True, text=True, timeout=60
         )
         if result.returncode != 0:
             return jsonify({"error": result.stderr or result.stdout}), 500
@@ -196,8 +190,7 @@ def apply_patch():
         return jsonify({"ok": True, "pr_url": pr_url, "branch": branch})
 
     except Exception as e:
-        app.logger.error(f"Error applying patch: {e}", exc_info=True)
-        return jsonify({"error": "An internal error occurred while applying the patch."}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
