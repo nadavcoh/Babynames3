@@ -281,55 +281,72 @@ function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").rep
 
 // ── Offline / server-availability support ────────────────────────────────────
 let pendingSave = false;
-let serverAvailable = true;
+let serverAvailable = true;  // proven false on first failed fetch
 
-function setServerAvailable(v){
-  serverAvailable = v;
-  updateOnlineStatus();
+// Timeout-aware fetch — rejects after ms milliseconds
+function fetchWithTimeout(url, opts, ms){
+  ms = ms || 6000;
+  var ctrl = new AbortController();
+  var tid = setTimeout(function(){ ctrl.abort(); }, ms);
+  return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
+    .finally(function(){ clearTimeout(tid); });
 }
 
-// Banner: only shown when actually offline. Syncing is shown via toast, never stuck.
+function setServerAvailable(v){
+  var changed = (serverAvailable !== v);
+  serverAvailable = v;
+  if(changed) updateOnlineStatus();
+  // When server comes back, flush any pending saves
+  if(v && pendingSave) flushPending();
+}
+
+// Banner: visible when offline OR server unavailable
 function updateOnlineStatus(){
   const ind = document.getElementById("offline-ind");
   if(!ind) return;
   if(!navigator.onLine){
     ind.style.display = "flex";
     ind.textContent = "⚡ Offline — changes saved locally";
+  } else if(!serverAvailable){
+    ind.style.display = "flex";
+    ind.textContent = "⚡ Server unavailable — changes saved locally";
   } else {
     ind.style.display = "none";
   }
 }
 
 async function flushPending(){
-  if(!navigator.onLine) return;
+  if(!navigator.onLine || !serverAvailable) return;
   let synced = false;
   const body = localStorage.getItem("pending-state");
   if(body){
     try{
-      const r = await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      const r = await fetchWithTimeout("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
       if(!r.ok) throw new Error(r.status);
       localStorage.removeItem("pending-state");
       synced = true;
-      setServerAvailable(true);
     }catch(e){ setServerAvailable(false); return; }
   }
   const sprefs = localStorage.getItem("pending-settings");
   if(sprefs){
     try{
-      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
+      const r = await fetchWithTimeout("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
+      if(!r.ok) throw new Error(r.status);
       localStorage.removeItem("pending-settings");
       synced = true;
-    }catch(e){ return; }
+    }catch(e){ setServerAvailable(false); return; }
   }
   const pratings = localStorage.getItem("pending-ratings");
   if(pratings){
     try{
-      await fetch("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:pratings});
+      const r = await fetchWithTimeout("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:pratings});
+      if(!r.ok) throw new Error(r.status);
       localStorage.removeItem("pending-ratings");
       synced = true;
-    }catch(e){ return; }
+    }catch(e){ setServerAvailable(false); return; }
   }
   pendingSave = false;
+  setServerAvailable(true);
   if(synced) showToast("✓ Changes synced to server");
 }
 
@@ -338,13 +355,12 @@ window.addEventListener("offline", function(){ updateOnlineStatus(); });
 
 function saveState(){
   const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
-  // Always write local backup
   try{ localStorage.setItem("local-state", body); }catch(e){}
   if(!navigator.onLine || !serverAvailable){
     try{ localStorage.setItem("pending-state", body); }catch(e){}
     pendingSave = true; updateOnlineStatus(); return;
   }
-  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
+  fetchWithTimeout("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
     .then(function(r){ if(!r.ok) throw new Error(r.status); setServerAvailable(true); })
     .catch(function(){
       setServerAvailable(false);
@@ -353,7 +369,7 @@ function saveState(){
     });
 }
 async function apiClear(){
-  try{await fetch("/api/state",{method:"DELETE"})}catch(e){}
+  try{ await fetchWithTimeout("/api/state",{method:"DELETE"}); }catch(e){}
   localStorage.removeItem("local-state");
   localStorage.removeItem("pending-state");
 }
@@ -367,25 +383,35 @@ function showToast(msg){
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function fetchWithCache(url, cacheKey){
+  // If server already known-down, go straight to cache
+  if(!serverAvailable){
+    const cached = localStorage.getItem(cacheKey);
+    if(cached) return JSON.parse(cached);
+    throw new Error("No cached data — open the app online first.");
+  }
   try{
-    const r = await fetch(url);
+    const r = await fetchWithTimeout(url, {}, 6000);
     if(!r.ok) throw new Error(r.status);
     const data = await r.json();
     try{ localStorage.setItem(cacheKey, JSON.stringify(data)); }catch(e){}
-    setServerAvailable(true);
     return data;
   }catch(e){
     setServerAvailable(false);
     const cached = localStorage.getItem(cacheKey);
-    if(cached){
-      if(cacheKey === "cached-names") showToast("📦 Loaded from cache (offline)");
-      return JSON.parse(cached);
-    }
+    if(cached) return JSON.parse(cached);
     throw new Error("No cached data — open the app online first.");
   }
 }
 
 async function init(){
+  // Quick server probe before parallel fetches — single timeout point
+  try{
+    await fetchWithTimeout("/api/state", {method:"HEAD"}, 4000);
+    setServerAvailable(true);
+  }catch(e){
+    setServerAvailable(false);
+  }
+
   let namesData, state;
   try{
     [namesData, state] = await Promise.all([
@@ -397,6 +423,7 @@ async function init(){
       '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
     return;
   }
+  if(!serverAvailable) showToast("📦 Loaded from cache (server unavailable)");
 
   RAW = namesData;
   const nameMap = {};
@@ -635,10 +662,9 @@ var skipQ = '';
 // ── Personal ratings (1–5 stars, server + localStorage) ─────────────
 var ratings = {};
 async function loadRatings(){
-  // Try server first, fall back to localStorage
   if(serverAvailable){
     try{
-      const r = await fetch("/api/ratings");
+      const r = await fetchWithTimeout("/api/ratings", {}, 5000);
       if(!r.ok) throw new Error(r.status);
       ratings = await r.json();
       try{ localStorage.setItem("cached-ratings", JSON.stringify(ratings)); }catch(e){}
@@ -654,7 +680,7 @@ function saveRatings(){
     try{ localStorage.setItem("pending-ratings", body); }catch(e){}
     pendingSave = true; return;
   }
-  fetch("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body})
+  fetchWithTimeout("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body})
     .then(function(r){ if(!r.ok) throw new Error(r.status); setServerAvailable(true); })
     .catch(function(){
       setServerAvailable(false);
@@ -862,7 +888,7 @@ async function saveSettings(){
   applySettings();
   buildDeck();
   try{
-    await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
+    await fetchWithTimeout("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
   }catch(e){
     try{ localStorage.setItem("pending-settings", JSON.stringify(SETTINGS)); }catch(e2){}
     pendingSave=true; updateOnlineStatus();
