@@ -82,6 +82,29 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .pcl{width:32px;height:32px;border-radius:50%;border:1.5px solid #c8c0b4;background:white;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center}
 .ph-btns{display:flex;gap:8px;align-items:center}
 .btn-clear{padding:4px 10px;border-radius:14px;border:1.5px solid #c8c0b4;background:white;font-size:.72rem;font-weight:600;cursor:pointer;color:var(--ro);font-family:'DM Sans',sans-serif}
+/* ── Saved/Skipped tabs ── */
+.lp-tabs{display:flex;border-bottom:1px solid #e0d9d0;background:var(--cr);position:sticky;top:57px;z-index:9}
+.lp-tab{flex:1;padding:10px;text-align:center;font-size:.78rem;font-weight:600;cursor:pointer;color:var(--mu);border-bottom:2.5px solid transparent;transition:all .2s}
+.lp-tab.on{color:var(--ink);border-bottom-color:var(--gd)}
+/* ── Sort bar inside saved panel ── */
+.lp-sort{display:flex;gap:5px;padding:8px 14px 6px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #f0ece6}
+.lp-sort-lbl{font-size:.68rem;color:var(--mu);flex-shrink:0;margin-right:2px}
+/* ── Skipped search ── */
+.sk-wrap{padding:10px 14px 6px;position:relative}
+.sk-ico{position:absolute;left:24px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none;font-size:.85rem}
+.sk-si{width:100%;padding:8px 12px 8px 32px;border-radius:20px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.82rem;outline:none}
+.sk-si:focus{border-color:var(--gd)}
+/* ── Skipped name row ── */
+.ski{display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06);padding:11px 14px}
+.ski-l{min-width:0}
+.ski-name{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;direction:rtl;line-height:1}
+.ski-meta{font-size:.68rem;color:var(--mu);margin-top:2px}
+.ski-acts{display:flex;gap:7px;flex-shrink:0}
+.ski-btn{padding:5px 11px;border-radius:14px;border:none;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.ski-save{background:var(--sgl);color:var(--sg)}
+.ski-del{background:var(--rol);color:var(--ro)}
+/* ── Rank badge on saved list items ── */
+.rank-pill{display:inline-block;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--skl);color:var(--sk);margin-top:3px}
 .ll{padding:12px;display:flex;flex-direction:column;gap:10px}
 .li{background:white;border-radius:13px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .li:hover{transform:translateY(-2px);box-shadow:0 5px 16px rgba(0,0,0,.1)}
@@ -191,14 +214,41 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   </div>
 </div>
 <div class="lp" id="lp">
+  <!-- Header -->
   <div class="ph">
-    <div class="pht">&#10084;&#65039; Saved names</div>
+    <div class="pht" id="lp-title">&#10084;&#65039; Saved names</div>
     <div class="ph-btns">
       <button class="btn-clear" id="btn-clear">Clear all</button>
       <button class="pcl" id="btn-lclose">&#x2715;</button>
     </div>
   </div>
-  <div class="ll" id="ll"></div>
+
+  <!-- Tab strip -->
+  <div class="lp-tabs">
+    <div class="lp-tab on" id="ltab-saved"   onclick="switchLPTab('saved')">&#10084; Saved</div>
+    <div class="lp-tab"    id="ltab-skipped" onclick="switchLPTab('skipped')">&#10006; Skipped</div>
+  </div>
+
+  <!-- ── Saved pane ── -->
+  <div id="lp-pane-saved">
+    <div class="lp-sort">
+      <span class="lp-sort-lbl">Sort:</span>
+      <button class="sb on" id="ls-order" onclick="setLikedSort('order')">Saved order</button>
+      <button class="sb"    id="ls-rk"    onclick="setLikedSort('rk')">Overall rank</button>
+      <button class="sb"    id="ls-r24"   onclick="setLikedSort('r24')">2024 rank</button>
+      <button class="sb"    id="ls-az"    onclick="setLikedSort('az')">A&#x2013;Z</button>
+    </div>
+    <div class="ll" id="ll"></div>
+  </div>
+
+  <!-- ── Skipped pane ── -->
+  <div id="lp-pane-skipped" style="display:none">
+    <div class="sk-wrap">
+      <span class="sk-ico">&#128269;</span>
+      <input class="sk-si" id="skip-si" placeholder="Search skipped names…" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="ll" id="ll-skipped"></div>
+  </div>
 </div>
 <div class="dm" id="dm">
   <div class="ds2" id="ds2"><div id="dc"></div></div>
@@ -224,7 +274,53 @@ function clrFor(c){return (CC[c]||CC.classic).co}
 function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
 // ── API helpers ──────────────────────────────────────────────────────────────
-let pendingSave = false;  // defined here, logic moved to startApp block below
+// ── Offline support ─────────────────────────────────────────────────────────
+let pendingSave = false;
+
+function updateOnlineStatus(){
+  const ind = document.getElementById("offline-ind");
+  if(!ind) return;
+  const offline = !navigator.onLine || pendingSave;
+  ind.style.display = offline ? "flex" : "none";
+  ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
+                                       : "⏫ Syncing to server…";
+}
+
+async function flushPending(){
+  const body = localStorage.getItem("pending-state");
+  if(body){
+    try{
+      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      localStorage.removeItem("pending-state");
+    }catch(e){ return; } // still offline
+  }
+  const sprefs = localStorage.getItem("pending-settings");
+  if(sprefs){
+    try{
+      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
+      localStorage.removeItem("pending-settings");
+    }catch(e){ return; }
+  }
+  pendingSave = false;
+  updateOnlineStatus();
+  showToast("✓ Back online — changes synced");
+}
+
+window.addEventListener("online",  function(){ updateOnlineStatus(); flushPending(); });
+window.addEventListener("offline", function(){ updateOnlineStatus(); });
+
+function saveState(){
+  const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
+  if(!navigator.onLine){
+    try{ localStorage.setItem("pending-state", body); }catch(e){}
+    pendingSave = true; updateOnlineStatus(); return;
+  }
+  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .catch(function(){
+      try{ localStorage.setItem("pending-state", body); }catch(e){}
+      pendingSave = true; updateOnlineStatus();
+    });
+}
 async function apiClear(){
   try{await fetch("/api/state",{method:"DELETE"})}catch(e){}
 }
@@ -236,7 +332,43 @@ function showToast(msg){
   clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity="0"},2200);
 }
 
-// init() replaced by startApp() below
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init(){
+  // Fetch names + state in parallel
+  const [namesRes, stateRes] = await Promise.all([
+    fetch("/api/names"),
+    fetch("/api/state")
+  ]);
+  RAW = await namesRes.json();
+  const state = await stateRes.json();
+  // Build lookup map so we can restore full objects from saved name strings
+  const nameMap = {};
+  RAW.forEach(function(n){ nameMap[n.h] = n; });
+  liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
+  skipped = new Set(state.skipped || []);
+
+  document.getElementById("loading").classList.add("hide");
+  buildTabs();
+  document.getElementById("savedBtn").onclick=showLiked;
+  document.getElementById("btn-n").onclick=function(){doSwipe("left")};
+  document.getElementById("btn-y").onclick=function(){doSwipe("right")};
+  document.getElementById("btn-u").onclick=doUndo;
+  document.getElementById("btn-picks").onclick=showLiked;
+  document.getElementById("btn-lclose").onclick=hideLiked;
+  document.getElementById("btn-clear").onclick=clearAll;
+  document.getElementById("skip-si").oninput=function(){skipQ=this.value;renderSkipped()};
+  document.getElementById("si").oninput=function(){q=this.value;buildDeck()};
+  document.getElementById("s-pop").onclick=function(){setSort("pop")};
+  document.getElementById("s-az").onclick=function(){setSort("az")};
+  document.getElementById("s-pk").onclick=function(){setSort("pk")};
+  document.getElementById("s-rd").onclick=function(){setSort("rd")};
+  document.getElementById("dm").onclick=function(e){if(e.target===this)hideDetail()};
+  updateCounter();
+  buildDeck();
+  if(liked.length>0||skipped.size>0){
+    showToast("\u2665 Restored: "+liked.length+" saved, "+skipped.size+" skipped");
+  }
+}
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function buildTabs(){
@@ -432,35 +564,127 @@ function updateCounter(){
   document.getElementById("savedBtn").textContent="\u2764\uFE0F "+liked.length+" saved";
 }
 
+
 // ── Liked panel ────────────────────────────────────────────────────────────
-function showLiked(){document.getElementById("lp").classList.add("sh");renderLiked()}
-function hideLiked(){document.getElementById("lp").classList.remove("sh")}
+var likedSort = 'order';
+var lpTab = 'saved';
+var skipQ = '';
+
+function showLiked(){
+  document.getElementById('lp').classList.add('sh');
+  renderLiked();
+  if(lpTab==='skipped') renderSkipped();
+}
+function hideLiked(){document.getElementById('lp').classList.remove('sh')}
+
+function switchLPTab(tab){
+  lpTab = tab;
+  document.getElementById('ltab-saved').classList.toggle('on', tab==='saved');
+  document.getElementById('ltab-skipped').classList.toggle('on', tab==='skipped');
+  document.getElementById('lp-pane-saved').style.display   = tab==='saved'   ? '' : 'none';
+  document.getElementById('lp-pane-skipped').style.display = tab==='skipped' ? '' : 'none';
+  document.getElementById('lp-title').innerHTML = tab==='saved'
+    ? '&#10084;&#65039; Saved names' : '&#10006; Skipped names';
+  document.getElementById('btn-clear').style.display = tab==='saved' ? '' : 'none';
+  if(tab==='skipped'){ renderSkipped(); document.getElementById('skip-si').focus(); }
+}
+
+function setLikedSort(s){
+  likedSort = s;
+  ['order','rk','r24','az'].forEach(function(id){
+    var el = document.getElementById('ls-'+id);
+    if(el) el.classList.toggle('on', id===s);
+  });
+  renderLiked();
+}
+
+function sortedLiked(){
+  var arr = liked.slice();
+  if(likedSort==='rk')       arr.sort(function(a,b){ return (a.rk||9999)-(b.rk||9999); });
+  else if(likedSort==='r24') arr.sort(function(a,b){
+    if(!a.r24 && !b.r24) return 0;
+    if(!a.r24) return 1; if(!b.r24) return -1;
+    return a.r24-b.r24;
+  });
+  else if(likedSort==='az')  arr.sort(function(a,b){ return a.h.localeCompare(b.h,'he'); });
+  return arr;
+}
 
 function renderLiked(){
   lC.forEach(function(c){try{c.destroy()}catch(e){}});lC=[];
-  const list=document.getElementById("ll");list.innerHTML="";
-  if(!liked.length){list.innerHTML='<div class="emp"><div class="ei">\uD83E\uDD0D</div>No names saved yet.<br>Swipe right on names you like!</div>';return}
-  liked.forEach(function(nm,idx){
-    const color=clrFor(nm.c);
-    const bigcls=CLC[nm.c]||"lc";
-    const cid="lc"+idx;
-    const item=document.createElement("div");
-    item.className="li";
+  var list=document.getElementById('ll'); list.innerHTML='';
+  if(!liked.length){
+    list.innerHTML='<div class="emp"><div class="ei">\uD83E\uDD0D</div>No names saved yet.<br>Swipe right on names you like!</div>';
+    return;
+  }
+  sortedLiked().forEach(function(nm,idx){
+    var color=clrFor(nm.c);
+    var bigcls=CLC[nm.c]||'lc';
+    var cid='lc'+idx;
+    var rankPill='';
+    if(likedSort==='rk'  && nm.rk)  rankPill='<span class="rank-pill">#'+nm.rk+' overall</span>';
+    if(likedSort==='r24' && nm.r24) rankPill='<span class="rank-pill">#'+nm.r24+' in 2024</span>';
+    var item=document.createElement('div');
+    item.className='li';
     item.innerHTML='<div class="lit">'
       +'<div class="lin '+bigcls+'">'+escH(nm.h)+'</div>'
       +'<div class="lim"><div class="lim-s">'+(CC[nm.c]||CC.classic).l+'</div>'
-      +'<div class="lis"><div class="li-st"><strong>'+fT(nm.t)+'</strong> total</div><div class="li-st"><strong>'+nm.p+'</strong> peak</div><div class="li-st"><strong>'+fR(nm.a)+'</strong> today</div></div></div>'
+      +'<div class="lis"><div class="li-st"><strong>'+fT(nm.t)+'</strong> total</div>'
+      +'<div class="li-st"><strong>'+nm.p+'</strong> peak</div>'
+      +'<div class="li-st"><strong>'+fR(nm.a)+'</strong> today</div></div>'
+      +(rankPill?'<div>'+rankPill+'</div>':'')+'</div>'
       +'<div style="color:#ccc;font-size:1.1rem">\u203A</div></div>'
       +'<div class="lic"><canvas id="'+cid+'" height="55"></canvas></div>';
     item.onclick=(function(n){return function(){showDetail(n)}})(nm);
     list.appendChild(item);
     setTimeout((function(id,n,col){return function(){
-      const cv=document.getElementById(id);if(!cv)return;
-      const ch=new Chart(cv.getContext("2d"),{type:"line",data:{labels:FY,datasets:[{data:n.b5,borderColor:col,backgroundColor:col+"18",borderWidth:2,pointRadius:0,tension:.4,fill:true}]},options:{responsive:true,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false,beginAtZero:true}}}});
+      var cv=document.getElementById(id);if(!cv)return;
+      var ch=new Chart(cv.getContext('2d'),{type:'line',data:{labels:FY,datasets:[{data:n.b5,borderColor:col,backgroundColor:col+'18',borderWidth:2,pointRadius:0,tension:.4,fill:true}]},options:{responsive:true,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false,beginAtZero:true}}}});
       lC.push(ch);
     }})(cid,nm,color),50);
   });
 }
+
+function renderSkipped(){
+  var list=document.getElementById('ll-skipped'); list.innerHTML='';
+  var nameMap={};RAW.forEach(function(n){nameMap[n.h]=n});
+  var arr=Array.from(skipped).map(function(h){return nameMap[h]}).filter(Boolean);
+  var q=(skipQ||'').trim();
+  if(q) arr=arr.filter(function(n){return n.h.includes(q)});
+  arr.sort(function(a,b){return (a.rk||9999)-(b.rk||9999)});
+  if(!arr.length){
+    list.innerHTML='<div class="emp"><div class="ei">\uD83D\uDE4C</div>'
+      +(q?'No skipped names match "'+escH(q)+'".':'No skipped names yet.')+'</div>';
+    return;
+  }
+  arr.forEach(function(nm){
+    var bigcls=CLC[nm.c]||'lc';
+    var item=document.createElement('div');
+    item.className='ski';
+    item.innerHTML='<div class="ski-l">'
+      +'<div class="ski-name '+bigcls+'">'+escH(nm.h)+'</div>'
+      +'<div class="ski-meta">'
+      +(nm.rk?'#'+nm.rk+' overall &middot; ':'')
+      +fT(nm.t)+' total &middot; '+nm.p+' peak'
+      +(nm.r24?' &middot; #'+nm.r24+' in 2024':'')
+      +'</div></div>'
+      +'<div class="ski-acts">'
+      +'<button class="ski-btn ski-save">\u2665 Save</button>'
+      +'<button class="ski-btn ski-del">\uD83D\uDDD1</button>'
+      +'</div>';
+    item.querySelector('.ski-save').onclick=(function(n){return function(){
+      skipped.delete(n.h); liked.push(n); saveState();
+      renderSkipped(); renderLiked(); updateCounter();
+      showToast('\u2665 '+n.h+' moved to saved');
+    }})(nm);
+    item.querySelector('.ski-del').onclick=(function(n){return function(){
+      if(!confirm('Remove '+n.h+' from skipped?')) return;
+      skipped.delete(n.h); saveState(); renderSkipped(); updateCounter();
+    }})(nm);
+    list.appendChild(item);
+  });
+}
+
 
 async function clearAll(){
   if(!confirm("Clear all saved and skipped names?")) return;
@@ -487,8 +711,10 @@ function showDetail(nm){
     +'<div class="dst"><div class="dsn" style="color:'+color+'">'+nm.p+'</div><div class="dsl">Peak year</div></div>'
     +'<div class="dst"><div class="dsn" style="color:'+color+'">'+nm.r+'%</div><div class="dsl">Since 2005</div></div>'
     +'<div class="dst"><div class="dsn" style="color:'+color+'">'+fR(nm.a)+'</div><div class="dsl">Given today</div></div>'
-    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+escH(nm.c)+'</div><div class="dsl">Category</div></div>'
-    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+(nm.by>0?nm.by+" boys":"Girls only")+'</div><div class="dsl">Boys same name</div></div>'
+    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+(nm.rk?'#'+nm.rk:'—')+'</div><div class="dsl">Overall rank</div></div>'
+    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+(nm.r24?'#'+nm.r24:'—')+'</div><div class="dsl">2024 rank</div></div>'
+    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+(nm.y24?nm.y24.toLocaleString():'0')+'</div><div class="dsl">Given in 2024</div></div>'
+    +'<div class="dst"><div class="dsn" style="color:'+color+'">'+(nm.by>0?nm.by+' boys':'Girls only')+'</div><div class="dsl">Boys same name</div></div>'
     +'</div>'
     +'<div class="dsc">Popularity 1949\u20132024</div>'
     +'<div class="dch"><canvas id="dcc" height="115"></canvas></div>'
@@ -507,125 +733,37 @@ function showDetail(nm){
 function hideDetail(){document.getElementById("dm").classList.remove("sh")}
 function removeLiked(nm){liked=liked.filter(function(n){return n!==nm});saveState();updateCounter();showToast("Removed from saved");renderLiked()}
 
-// init() called after all patches are applied below
+init();
 
 
-// ═══════════════════════════════════════════════════════════════
-// SETTINGS + OFFLINE + PWA STARTUP — all wired up cleanly below
-// ═══════════════════════════════════════════════════════════════
-
+// ═══ SETTINGS ═══
 let SETTINGS = {};
-let serverAvailable = true;  // proved false on first failed API call
 
-// ── Server availability probe ────────────────────────────────────────────────
-async function checkServer(){
-  try{
-    const r = await fetch("/api/state", {method:"HEAD", cache:"no-store"});
-    serverAvailable = r.ok || r.status < 500;
-  }catch(e){
-    serverAvailable = false;
-  }
-  return serverAvailable;
-}
-
-// ── Offline indicator ────────────────────────────────────────────────────────
-function updateOnlineStatus(){
-  const ind = document.getElementById("offline-ind");
-  if(!ind) return;
-  const online = navigator.onLine && serverAvailable;
-  if(!online){
-    ind.style.display = "flex";
-    ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
-                                        : "⚡ Server unavailable — changes saved locally";
-  } else if(pendingSave){
-    ind.style.display = "flex";
-    ind.textContent = "⏫ Back online — syncing…";
-  } else {
-    ind.style.display = "none";
-  }
-}
-
-async function flushPending(){
-  if(!(await checkServer())) return;
-  const body = localStorage.getItem("pending-state");
-  if(body){
-    try{
-      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
-      localStorage.removeItem("pending-state");
-    }catch(e){ serverAvailable=false; updateOnlineStatus(); return; }
-  }
-  const sprefs = localStorage.getItem("pending-settings");
-  if(sprefs){
-    try{
-      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
-      localStorage.removeItem("pending-settings");
-    }catch(e){ serverAvailable=false; updateOnlineStatus(); return; }
-  }
-  pendingSave = false;
-  updateOnlineStatus();
-  showToast("✓ Changes synced to server");
-}
-
-window.addEventListener("online",  function(){ flushPending(); });
-window.addEventListener("offline", function(){ serverAvailable=false; updateOnlineStatus(); });
-
-// ── State save: server with localStorage fallback ────────────────────────────
-function saveState(){
-  const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
-  // Always keep localStorage in sync as a backup
-  try{ localStorage.setItem("local-state", body); }catch(e){}
-  if(!navigator.onLine || !serverAvailable){
-    try{ localStorage.setItem("pending-state", body); }catch(e){}
-    pendingSave = true; updateOnlineStatus(); return;
-  }
-  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
-    .then(function(r){ if(!r.ok) throw new Error(r.status); })
-    .catch(function(e){ // Added 'e' to catch the error object
-      console.error("Error saving state to server:", e); // Log the error
-      serverAvailable = false;
-      try{ localStorage.setItem("pending-state", body); }catch(e){} // Catch inner error as well
-      pendingSave = true; updateOnlineStatus();
-    });
-}
-
-// ── Settings ─────────────────────────────────────────────────────────────────
 async function loadSettings(){
-  if(serverAvailable){
-    try{
-      const res = await fetch("/api/settings");
-      SETTINGS = await res.json();
-      try{ localStorage.setItem("local-settings", JSON.stringify(SETTINGS)); }catch(e){}
-    }catch(e){
-      serverAvailable = false;
-      SETTINGS = JSON.parse(localStorage.getItem("local-settings") || "{}");
-    }
-  } else {
-    SETTINGS = JSON.parse(localStorage.getItem("local-settings") || "{}");
-  }
+  try{
+    const res = await fetch("/api/settings");
+    SETTINGS = await res.json();
+  }catch(e){ SETTINGS = {}; }
   applySettings();
-  buildDeck();
+  buildDeck(); // rebuild deck with loaded settings
 }
 
 async function saveSettings(){
   applySettings();
   buildDeck();
-  const body = JSON.stringify(SETTINGS);
-  try{ localStorage.setItem("local-settings", body); }catch(e){}
-  if(!navigator.onLine || !serverAvailable){
-    try{ localStorage.setItem("pending-settings", body); }catch(e){}
-    pendingSave = true; updateOnlineStatus(); return;
+  try{
+    await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
+  }catch(e){
+    try{ localStorage.setItem("pending-settings", JSON.stringify(SETTINGS)); }catch(e2){}
+    pendingSave=true; updateOnlineStatus();
   }
-  fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body})
-    .catch(function(){
-      serverAvailable = false;
-      try{ localStorage.setItem("pending-settings", body); }catch(e){}
-      pendingSave = true; updateOnlineStatus();
-    });
 }
 
 function applySettings(){
-  const setChk = function(id,val){ var el=document.getElementById(id); if(el) el.checked=!!val; };
-  const setSel = function(id,val){ var el=document.getElementById(id); if(el) el.value=String(val); };
+  // Sync toggles to current SETTINGS
+  const get = (id, def) => document.getElementById(id) ? document.getElementById(id) : null;
+  const setChk = (id, val) => { const el=document.getElementById(id); if(el) el.checked=!!val; };
+  const setSel = (id, val) => { const el=document.getElementById(id); if(el) el.value=String(val); };
   setChk("s-vintage",  SETTINGS.showVintage  !== false);
   setChk("s-modern",   SETTINGS.showModern   !== false);
   setChk("s-classic",  SETTINGS.showClassic  !== false);
@@ -635,8 +773,8 @@ function applySettings(){
 }
 
 function readSettings(){
-  var chk = function(id){ var el=document.getElementById(id); return el ? el.checked : true; };
-  var sel = function(id){ var el=document.getElementById(id); return el ? parseInt(el.value) : 20; };
+  const chk = id => document.getElementById(id) ? document.getElementById(id).checked : true;
+  const sel = id => { const el=document.getElementById(id); return el ? parseInt(el.value) : 20; };
   SETTINGS.showVintage   = chk("s-vintage");
   SETTINGS.showModern    = chk("s-modern");
   SETTINGS.showClassic   = chk("s-classic");
@@ -646,6 +784,7 @@ function readSettings(){
 }
 
 function openSettings(){
+  // Update stats
   document.getElementById("stat-liked").textContent   = liked.length;
   document.getElementById("stat-skipped").textContent = skipped.size;
   document.getElementById("stat-remain").textContent  = deck.length;
@@ -657,28 +796,29 @@ function closeSettings(){ document.getElementById("settingsPanel").classList.rem
 function initSettings(){
   document.getElementById("btn-settings").onclick = openSettings;
   document.getElementById("btn-sp-close").onclick = closeSettings;
+
+  // Live-save on any change
   ["s-vintage","s-modern","s-classic","s-unisex","s-daughters"].forEach(function(id){
-    var el=document.getElementById(id);
+    const el=document.getElementById(id);
     if(el) el.onchange = function(){ readSettings(); saveSettings(); };
   });
   document.getElementById("s-minTotal").onchange = function(){ readSettings(); saveSettings(); };
+
   document.getElementById("sp-clear-skipped").onclick = async function(){
-    skipped=new Set(); saveState(); buildDeck(); closeSettings(); showToast("Skipped names restored");
+    skipped=new Set(); await saveState(); buildDeck(); closeSettings(); showToast("Skipped names restored");
   };
   document.getElementById("sp-clear-all").onclick = async function(){
     if(!confirm("Clear all saved and skipped names?")) return;
     try{ await fetch("/api/state",{method:"DELETE"}); }catch(e){}
-    localStorage.removeItem("local-state");
-    localStorage.removeItem("pending-state");
     liked=[];skipped=new Set();hist=[];updateCounter();buildDeck();closeSettings();showToast("Cleared");
   };
 }
 
-// ── buildDeck respects settings ───────────────────────────────────────────────
-var _origBuildDeck = buildDeck;
+// ═══ PATCH buildDeck to respect settings ═══
+const _origBuildDeck = buildDeck;
 buildDeck = function(){
-  var likedSet = new Set(liked.map(function(n){return n.h}));
-  var src = RAW.filter(function(n){
+  const likedSet = new Set(liked.map(function(n){return n.h}));
+  let src = RAW.filter(function(n){
     if(likedSet.has(n.h)) return false;
     if(skipped.has(n.h))  return false;
     if((SETTINGS.minTotal||20) > n.t) return false;
@@ -696,95 +836,19 @@ buildDeck = function(){
   renderDeck();
 };
 
-// ── PWA/serverless startup: load names from cache if server is down ───────────
-async function fetchNamesWithFallback(){
-  try{
-    var res = await fetch("/api/names");
-    if(!res.ok) throw new Error(res.status);
-    var data = await res.json();
-    try{ localStorage.setItem("cached-names", JSON.stringify(data)); }catch(e){}
-    return data;
-  }catch(e){
-    serverAvailable = false;
-    var cached = localStorage.getItem("cached-names");
-    if(cached){ showToast("📦 Loaded from cache (offline)"); return JSON.parse(cached); }
-    throw new Error("No names available — open the app online first to cache data.");
-  }
-}
-
-async function fetchStateWithFallback(){
-  if(!serverAvailable){
-    var local = localStorage.getItem("local-state");
-    return local ? JSON.parse(local) : {liked:[],skipped:[]};
-  }
-  try{
-    var res = await fetch("/api/state");
-    if(!res.ok) throw new Error(res.status);
-    return await res.json();
-  }catch(e){
-    serverAvailable = false;
-    var local = localStorage.getItem("local-state");
-    return local ? JSON.parse(local) : {liked:[],skipped:[]};
-  }
-}
-
-// ── Master init ───────────────────────────────────────────────────────────────
-async function startApp(){
-  // Check server first so fallbacks know what to do
-  await checkServer();
-
-  var namesData, state;
-  try{
-    [namesData, state] = await Promise.all([
-      fetchNamesWithFallback(),
-      fetchStateWithFallback()
-    ]);
-  }catch(e){
-    document.getElementById("loading").innerHTML =
-      '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
-    return;
-  }
-
-  RAW = namesData;
-  var nameMap = {};
-  RAW.forEach(function(n){ nameMap[n.h] = n; });
-  liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
-  skipped = new Set(state.skipped || []);
-
-  document.getElementById("loading").classList.add("hide");
-  buildTabs();
-  document.getElementById("savedBtn").onclick=showLiked;
-  document.getElementById("btn-n").onclick=function(){doSwipe("left")};
-  document.getElementById("btn-y").onclick=function(){doSwipe("right")};
-  document.getElementById("btn-u").onclick=doUndo;
-  document.getElementById("btn-picks").onclick=showLiked;
-  document.getElementById("btn-lclose").onclick=hideLiked;
-  document.getElementById("btn-clear").onclick=clearAll;
-  document.getElementById("si").oninput=function(){q=this.value;buildDeck()};
-  document.getElementById("s-pop").onclick=function(){setSort("pop")};
-  document.getElementById("s-az").onclick=function(){setSort("az")};
-  document.getElementById("s-pk").onclick=function(){setSort("pk")};
-  document.getElementById("s-rd").onclick=function(){setSort("rd")};
-  document.getElementById("dm").onclick=function(e){if(e.target===this)hideDetail()};
-  updateCounter();
-
-  // Settings + service worker
+// ═══ PATCH init to load settings too ═══
+const _origInit = init;
+init = async function(){
+  await _origInit();
   await loadSettings();
   initSettings();
-
+  // Register service worker
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("/static/sw.js").catch(function(){});
   }
-
   updateOnlineStatus();
-  if(pendingSave) flushPending();
-
-  if(liked.length > 0 || skipped.size > 0){
-    showToast("\u2665 Restored: " + liked.length + " saved, " + skipped.size + " skipped");
-  }
-}
-
-startApp();
+  if(pendingSave && navigator.onLine) flushPending();
+};
 
 </script>
 

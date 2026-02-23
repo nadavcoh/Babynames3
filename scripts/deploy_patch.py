@@ -58,7 +58,7 @@ print(f"Repo    : {GITHUB_REPO}\n")
 if os.path.isdir(os.path.join(WORK_DIR, ".git")):
     print("→ Updating existing clone...")
     run("lg2", "checkout", "main", cwd=WORK_DIR)
-    run("lg2", "pull", cwd=WORK_DIR)
+    run("lg2", "pull", AUTHED, "main", cwd=WORK_DIR)
 else:
     print("→ Cloning repo...")
     os.makedirs(os.path.dirname(WORK_DIR), exist_ok=True)
@@ -113,11 +113,12 @@ if not status:
     die("No changes — tarball is identical to main.")
 
 run("lg2", "commit", "-m", PR_TITLE,
+    "--author", "iOS Patch <patch@shem-tov.local>",
     cwd=WORK_DIR)
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 print(f"→ Pushing...")
-run("lg2", "push", cwd=WORK_DIR)
+run("lg2", "push", AUTHED, BRANCH, cwd=WORK_DIR)
 
 # ── Open PR ───────────────────────────────────────────────────────────────────
 print("→ Creating PR...")
