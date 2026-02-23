@@ -3,7 +3,7 @@
 
 Israeli Jewish girls' name swiper · 3,603 names from CBS 1949–2024
 
-Data source: [Israel Central Bureau of Statistics — Current names of people born 1949–2024](https://www.cbs.gov.il/he/subjects/Pages/%D7%A9%D7%9E%D7%95%D7%AA-%D7%A4%D7%A8%D7%98%D7%99%D7%99%D7%9D.aspx)
+Data source: [Israel CBS — Personal Names publication 391, December 2025](https://www.cbs.gov.il/he/mediarelease/DocLib/2025/391/11_25_391b.pdf) · [Download Excel data](https://www.cbs.gov.il/he/mediarelease/DocLib/2025/391/11_25_391t1.xlsx)
 
 ---
 
@@ -119,6 +119,8 @@ deploy.bat                       :: pull + restart (run manually if needed)
 | DELETE | `/api/state` | Clear all progress |
 | GET | `/api/settings` | User preferences |
 | POST | `/api/settings` | Save preferences |
+| GET | `/api/ratings` | Star ratings |
+| POST | `/api/ratings` | Save star ratings |
 
 ---
 
