@@ -88,7 +88,7 @@ with tarfile.open(TARBALL) as t:
             if ".." in m.name or m.name.startswith("/"):
                 print(f"✗ Skipping potentially malicious path in tarball: {m.name}")
                 continue
-            t.extract(m, EXTRACT_TMP)
+            t.extract(m, EXTRACT_TMP, filter='data')
 
 SKIP = {"venv", "__pycache__", ".git"}
 for item in os.listdir(EXTRACT_TMP):
