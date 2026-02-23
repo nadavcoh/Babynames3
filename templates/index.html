@@ -224,53 +224,7 @@ function clrFor(c){return (CC[c]||CC.classic).co}
 function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
 // ── API helpers ──────────────────────────────────────────────────────────────
-// ── Offline support ─────────────────────────────────────────────────────────
-let pendingSave = false;
-
-function updateOnlineStatus(){
-  const ind = document.getElementById("offline-ind");
-  if(!ind) return;
-  const offline = !navigator.onLine || pendingSave;
-  ind.style.display = offline ? "flex" : "none";
-  ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
-                                       : "⏫ Syncing to server…";
-}
-
-async function flushPending(){
-  const body = localStorage.getItem("pending-state");
-  if(body){
-    try{
-      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
-      localStorage.removeItem("pending-state");
-    }catch(e){ return; } // still offline
-  }
-  const sprefs = localStorage.getItem("pending-settings");
-  if(sprefs){
-    try{
-      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
-      localStorage.removeItem("pending-settings");
-    }catch(e){ return; }
-  }
-  pendingSave = false;
-  updateOnlineStatus();
-  showToast("✓ Back online — changes synced");
-}
-
-window.addEventListener("online",  function(){ updateOnlineStatus(); flushPending(); });
-window.addEventListener("offline", function(){ updateOnlineStatus(); });
-
-function saveState(){
-  const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
-  if(!navigator.onLine){
-    try{ localStorage.setItem("pending-state", body); }catch(e){}
-    pendingSave = true; updateOnlineStatus(); return;
-  }
-  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
-    .catch(function(){
-      try{ localStorage.setItem("pending-state", body); }catch(e){}
-      pendingSave = true; updateOnlineStatus();
-    });
-}
+let pendingSave = false;  // defined here, logic moved to startApp block below
 async function apiClear(){
   try{await fetch("/api/state",{method:"DELETE"})}catch(e){}
 }
@@ -282,42 +236,7 @@ function showToast(msg){
   clearTimeout(t._t);t._t=setTimeout(function(){t.style.opacity="0"},2200);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
-async function init(){
-  // Fetch names + state in parallel
-  const [namesRes, stateRes] = await Promise.all([
-    fetch("/api/names"),
-    fetch("/api/state")
-  ]);
-  RAW = await namesRes.json();
-  const state = await stateRes.json();
-  // Build lookup map so we can restore full objects from saved name strings
-  const nameMap = {};
-  RAW.forEach(function(n){ nameMap[n.h] = n; });
-  liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
-  skipped = new Set(state.skipped || []);
-
-  document.getElementById("loading").classList.add("hide");
-  buildTabs();
-  document.getElementById("savedBtn").onclick=showLiked;
-  document.getElementById("btn-n").onclick=function(){doSwipe("left")};
-  document.getElementById("btn-y").onclick=function(){doSwipe("right")};
-  document.getElementById("btn-u").onclick=doUndo;
-  document.getElementById("btn-picks").onclick=showLiked;
-  document.getElementById("btn-lclose").onclick=hideLiked;
-  document.getElementById("btn-clear").onclick=clearAll;
-  document.getElementById("si").oninput=function(){q=this.value;buildDeck()};
-  document.getElementById("s-pop").onclick=function(){setSort("pop")};
-  document.getElementById("s-az").onclick=function(){setSort("az")};
-  document.getElementById("s-pk").onclick=function(){setSort("pk")};
-  document.getElementById("s-rd").onclick=function(){setSort("rd")};
-  document.getElementById("dm").onclick=function(e){if(e.target===this)hideDetail()};
-  updateCounter();
-  buildDeck();
-  if(liked.length>0||skipped.size>0){
-    showToast("\u2665 Restored: "+liked.length+" saved, "+skipped.size+" skipped");
-  }
-}
+// init() replaced by startApp() below
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function buildTabs(){
@@ -588,37 +507,125 @@ function showDetail(nm){
 function hideDetail(){document.getElementById("dm").classList.remove("sh")}
 function removeLiked(nm){liked=liked.filter(function(n){return n!==nm});saveState();updateCounter();showToast("Removed from saved");renderLiked()}
 
-init();
+// init() called after all patches are applied below
 
 
-// ═══ SETTINGS ═══
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS + OFFLINE + PWA STARTUP — all wired up cleanly below
+// ═══════════════════════════════════════════════════════════════
+
 let SETTINGS = {};
+let serverAvailable = true;  // proved false on first failed API call
 
-async function loadSettings(){
+// ── Server availability probe ────────────────────────────────────────────────
+async function checkServer(){
   try{
-    const res = await fetch("/api/settings");
-    SETTINGS = await res.json();
-  }catch(e){ SETTINGS = {}; }
+    const r = await fetch("/api/state", {method:"HEAD", cache:"no-store"});
+    serverAvailable = r.ok || r.status < 500;
+  }catch(e){
+    serverAvailable = false;
+  }
+  return serverAvailable;
+}
+
+// ── Offline indicator ────────────────────────────────────────────────────────
+function updateOnlineStatus(){
+  const ind = document.getElementById("offline-ind");
+  if(!ind) return;
+  const online = navigator.onLine && serverAvailable;
+  if(!online){
+    ind.style.display = "flex";
+    ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
+                                        : "⚡ Server unavailable — changes saved locally";
+  } else if(pendingSave){
+    ind.style.display = "flex";
+    ind.textContent = "⏫ Back online — syncing…";
+  } else {
+    ind.style.display = "none";
+  }
+}
+
+async function flushPending(){
+  if(!(await checkServer())) return;
+  const body = localStorage.getItem("pending-state");
+  if(body){
+    try{
+      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      localStorage.removeItem("pending-state");
+    }catch(e){ serverAvailable=false; updateOnlineStatus(); return; }
+  }
+  const sprefs = localStorage.getItem("pending-settings");
+  if(sprefs){
+    try{
+      await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
+      localStorage.removeItem("pending-settings");
+    }catch(e){ serverAvailable=false; updateOnlineStatus(); return; }
+  }
+  pendingSave = false;
+  updateOnlineStatus();
+  showToast("✓ Changes synced to server");
+}
+
+window.addEventListener("online",  function(){ flushPending(); });
+window.addEventListener("offline", function(){ serverAvailable=false; updateOnlineStatus(); });
+
+// ── State save: server with localStorage fallback ────────────────────────────
+function saveState(){
+  const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
+  // Always keep localStorage in sync as a backup
+  try{ localStorage.setItem("local-state", body); }catch(e){}
+  if(!navigator.onLine || !serverAvailable){
+    try{ localStorage.setItem("pending-state", body); }catch(e){}
+    pendingSave = true; updateOnlineStatus(); return;
+  }
+  fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .then(function(r){ if(!r.ok) throw new Error(r.status); })
+    .catch(function(e){ // Added 'e' to catch the error object
+      console.error("Error saving state to server:", e); // Log the error
+      serverAvailable = false;
+      try{ localStorage.setItem("pending-state", body); }catch(e){} // Catch inner error as well
+      pendingSave = true; updateOnlineStatus();
+    });
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+async function loadSettings(){
+  if(serverAvailable){
+    try{
+      const res = await fetch("/api/settings");
+      SETTINGS = await res.json();
+      try{ localStorage.setItem("local-settings", JSON.stringify(SETTINGS)); }catch(e){}
+    }catch(e){
+      serverAvailable = false;
+      SETTINGS = JSON.parse(localStorage.getItem("local-settings") || "{}");
+    }
+  } else {
+    SETTINGS = JSON.parse(localStorage.getItem("local-settings") || "{}");
+  }
   applySettings();
-  buildDeck(); // rebuild deck with loaded settings
+  buildDeck();
 }
 
 async function saveSettings(){
   applySettings();
   buildDeck();
-  try{
-    await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
-  }catch(e){
-    try{ localStorage.setItem("pending-settings", JSON.stringify(SETTINGS)); }catch(e2){}
-    pendingSave=true; updateOnlineStatus();
+  const body = JSON.stringify(SETTINGS);
+  try{ localStorage.setItem("local-settings", body); }catch(e){}
+  if(!navigator.onLine || !serverAvailable){
+    try{ localStorage.setItem("pending-settings", body); }catch(e){}
+    pendingSave = true; updateOnlineStatus(); return;
   }
+  fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .catch(function(){
+      serverAvailable = false;
+      try{ localStorage.setItem("pending-settings", body); }catch(e){}
+      pendingSave = true; updateOnlineStatus();
+    });
 }
 
 function applySettings(){
-  // Sync toggles to current SETTINGS
-  const get = (id, def) => document.getElementById(id) ? document.getElementById(id) : null;
-  const setChk = (id, val) => { const el=document.getElementById(id); if(el) el.checked=!!val; };
-  const setSel = (id, val) => { const el=document.getElementById(id); if(el) el.value=String(val); };
+  const setChk = function(id,val){ var el=document.getElementById(id); if(el) el.checked=!!val; };
+  const setSel = function(id,val){ var el=document.getElementById(id); if(el) el.value=String(val); };
   setChk("s-vintage",  SETTINGS.showVintage  !== false);
   setChk("s-modern",   SETTINGS.showModern   !== false);
   setChk("s-classic",  SETTINGS.showClassic  !== false);
@@ -628,8 +635,8 @@ function applySettings(){
 }
 
 function readSettings(){
-  const chk = id => document.getElementById(id) ? document.getElementById(id).checked : true;
-  const sel = id => { const el=document.getElementById(id); return el ? parseInt(el.value) : 20; };
+  var chk = function(id){ var el=document.getElementById(id); return el ? el.checked : true; };
+  var sel = function(id){ var el=document.getElementById(id); return el ? parseInt(el.value) : 20; };
   SETTINGS.showVintage   = chk("s-vintage");
   SETTINGS.showModern    = chk("s-modern");
   SETTINGS.showClassic   = chk("s-classic");
@@ -639,7 +646,6 @@ function readSettings(){
 }
 
 function openSettings(){
-  // Update stats
   document.getElementById("stat-liked").textContent   = liked.length;
   document.getElementById("stat-skipped").textContent = skipped.size;
   document.getElementById("stat-remain").textContent  = deck.length;
@@ -651,29 +657,28 @@ function closeSettings(){ document.getElementById("settingsPanel").classList.rem
 function initSettings(){
   document.getElementById("btn-settings").onclick = openSettings;
   document.getElementById("btn-sp-close").onclick = closeSettings;
-
-  // Live-save on any change
   ["s-vintage","s-modern","s-classic","s-unisex","s-daughters"].forEach(function(id){
-    const el=document.getElementById(id);
+    var el=document.getElementById(id);
     if(el) el.onchange = function(){ readSettings(); saveSettings(); };
   });
   document.getElementById("s-minTotal").onchange = function(){ readSettings(); saveSettings(); };
-
   document.getElementById("sp-clear-skipped").onclick = async function(){
-    skipped=new Set(); await saveState(); buildDeck(); closeSettings(); showToast("Skipped names restored");
+    skipped=new Set(); saveState(); buildDeck(); closeSettings(); showToast("Skipped names restored");
   };
   document.getElementById("sp-clear-all").onclick = async function(){
     if(!confirm("Clear all saved and skipped names?")) return;
     try{ await fetch("/api/state",{method:"DELETE"}); }catch(e){}
+    localStorage.removeItem("local-state");
+    localStorage.removeItem("pending-state");
     liked=[];skipped=new Set();hist=[];updateCounter();buildDeck();closeSettings();showToast("Cleared");
   };
 }
 
-// ═══ PATCH buildDeck to respect settings ═══
-const _origBuildDeck = buildDeck;
+// ── buildDeck respects settings ───────────────────────────────────────────────
+var _origBuildDeck = buildDeck;
 buildDeck = function(){
-  const likedSet = new Set(liked.map(function(n){return n.h}));
-  let src = RAW.filter(function(n){
+  var likedSet = new Set(liked.map(function(n){return n.h}));
+  var src = RAW.filter(function(n){
     if(likedSet.has(n.h)) return false;
     if(skipped.has(n.h))  return false;
     if((SETTINGS.minTotal||20) > n.t) return false;
@@ -691,19 +696,95 @@ buildDeck = function(){
   renderDeck();
 };
 
-// ═══ PATCH init to load settings too ═══
-const _origInit = init;
-init = async function(){
-  await _origInit();
+// ── PWA/serverless startup: load names from cache if server is down ───────────
+async function fetchNamesWithFallback(){
+  try{
+    var res = await fetch("/api/names");
+    if(!res.ok) throw new Error(res.status);
+    var data = await res.json();
+    try{ localStorage.setItem("cached-names", JSON.stringify(data)); }catch(e){}
+    return data;
+  }catch(e){
+    serverAvailable = false;
+    var cached = localStorage.getItem("cached-names");
+    if(cached){ showToast("📦 Loaded from cache (offline)"); return JSON.parse(cached); }
+    throw new Error("No names available — open the app online first to cache data.");
+  }
+}
+
+async function fetchStateWithFallback(){
+  if(!serverAvailable){
+    var local = localStorage.getItem("local-state");
+    return local ? JSON.parse(local) : {liked:[],skipped:[]};
+  }
+  try{
+    var res = await fetch("/api/state");
+    if(!res.ok) throw new Error(res.status);
+    return await res.json();
+  }catch(e){
+    serverAvailable = false;
+    var local = localStorage.getItem("local-state");
+    return local ? JSON.parse(local) : {liked:[],skipped:[]};
+  }
+}
+
+// ── Master init ───────────────────────────────────────────────────────────────
+async function startApp(){
+  // Check server first so fallbacks know what to do
+  await checkServer();
+
+  var namesData, state;
+  try{
+    [namesData, state] = await Promise.all([
+      fetchNamesWithFallback(),
+      fetchStateWithFallback()
+    ]);
+  }catch(e){
+    document.getElementById("loading").innerHTML =
+      '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
+    return;
+  }
+
+  RAW = namesData;
+  var nameMap = {};
+  RAW.forEach(function(n){ nameMap[n.h] = n; });
+  liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
+  skipped = new Set(state.skipped || []);
+
+  document.getElementById("loading").classList.add("hide");
+  buildTabs();
+  document.getElementById("savedBtn").onclick=showLiked;
+  document.getElementById("btn-n").onclick=function(){doSwipe("left")};
+  document.getElementById("btn-y").onclick=function(){doSwipe("right")};
+  document.getElementById("btn-u").onclick=doUndo;
+  document.getElementById("btn-picks").onclick=showLiked;
+  document.getElementById("btn-lclose").onclick=hideLiked;
+  document.getElementById("btn-clear").onclick=clearAll;
+  document.getElementById("si").oninput=function(){q=this.value;buildDeck()};
+  document.getElementById("s-pop").onclick=function(){setSort("pop")};
+  document.getElementById("s-az").onclick=function(){setSort("az")};
+  document.getElementById("s-pk").onclick=function(){setSort("pk")};
+  document.getElementById("s-rd").onclick=function(){setSort("rd")};
+  document.getElementById("dm").onclick=function(e){if(e.target===this)hideDetail()};
+  updateCounter();
+
+  // Settings + service worker
   await loadSettings();
   initSettings();
-  // Register service worker
+
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("/static/sw.js").catch(function(){});
   }
+
   updateOnlineStatus();
-  if(pendingSave && navigator.onLine) flushPending();
-};
+  if(pendingSave) flushPending();
+
+  if(liked.length > 0 || skipped.size > 0){
+    showToast("\u2665 Restored: " + liked.length + " saved, " + skipped.size + " skipped");
+  }
+}
+
+startApp();
 
 </script>
 
