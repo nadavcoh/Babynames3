@@ -84,6 +84,10 @@ with tarfile.open(TARBALL) as t:
         elif parts[0] == top:
             continue
         if m.name:
+            # Security: ensure path is safe before extracting
+            if ".." in m.name or m.name.startswith("/"):
+                print(f"✗ Skipping potentially malicious path in tarball: {m.name}")
+                continue
             t.extract(m, EXTRACT_TMP)
 
 SKIP = {"venv", "__pycache__", ".git"}
