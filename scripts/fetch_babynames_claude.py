@@ -39,48 +39,34 @@ def download(url: str, dest: str) -> None:
     urllib.request.urlretrieve(url, dest, reporthook=_reporthook)
     print(f"\nSaved to: {dest}")
 
-
 def open_with_claude(filepath: str) -> None:
     """
     Pass *filepath* to the Claude iOS app.
 
     a-Shell exposes two ways to hand a file to another app:
-      1. `share <file>`   – raises the native iOS share sheet
+    `open <file>`   – raises the native iOS share sheet
                             (tap 'Claude' in the share sheet).
-      2. `open -a Claude <file>` – opens directly if Claude registers
-                            a document type handler for .tar.gz / UTI
-                            public.tar-archive (less reliable).
 
-    We try the direct open first and fall back to the share sheet.
     """
-#    print("\nOpening file with Claude 
-#…")
-#
-    # Attempt 1: direct open (works if Claude registers the UTI)
+    print("\nOpening file with Claude …")
+
+    # iOS share sheet via a-Shell's built-in 'open' command
     result = subprocess.run(
         ["open", filepath],
         capture_output=True,
         text=True,
     )
-#
-    if result.returncode == 0:
-        print("✓ File sent to Claudedirectly.")
-        return
-#
-    # Attempt 2: iOS share sheet via a-Shell's built-in 'share' command
-    print("Direct open failed – raising iOS share sheet instead …")
-    result = subprocess.run(["share", filepath], capture_output=True, text=True)
 
     if result.returncode == 0:
-        print("✓ Share sheet raised. Tap Claude to continue.")
+        print("✓ File sent to Claude.")
+        return
+
     else:
         # Last resort: print the path so the user can share manually
         print(
             "\n⚠️  Could not open share sheet automatically.\n"
             f"   File is at: {filepath}\n"
-            "   Long-press the file in the Files app and choose 'Share → Claude'."
         )
-
 
 def main() -> None:
     download(GITHUB_URL, DEST_FILE)
