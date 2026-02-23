@@ -279,56 +279,83 @@ function fR(a){if(a===0)return "~0/yr";if(a>=1000)return "~"+(a/1000).toFixed(1)
 function clrFor(c){return (CC[c]||CC.classic).co}
 function escH(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 
-// ── API helpers ──────────────────────────────────────────────────────────────
-// ── Offline support ─────────────────────────────────────────────────────────
+// ── Offline / server-availability support ────────────────────────────────────
 let pendingSave = false;
+let serverAvailable = true;
 
+function setServerAvailable(v){
+  serverAvailable = v;
+  updateOnlineStatus();
+}
+
+// Banner: only shown when actually offline. Syncing is shown via toast, never stuck.
 function updateOnlineStatus(){
   const ind = document.getElementById("offline-ind");
   if(!ind) return;
-  const offline = !navigator.onLine || pendingSave;
-  ind.style.display = offline ? "flex" : "none";
-  ind.textContent = !navigator.onLine ? "⚡ Offline — changes saved locally"
-                                       : "⏫ Syncing to server…";
+  if(!navigator.onLine){
+    ind.style.display = "flex";
+    ind.textContent = "⚡ Offline — changes saved locally";
+  } else {
+    ind.style.display = "none";
+  }
 }
 
 async function flushPending(){
+  if(!navigator.onLine) return;
+  let synced = false;
   const body = localStorage.getItem("pending-state");
   if(body){
     try{
-      await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      const r = await fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body});
+      if(!r.ok) throw new Error(r.status);
       localStorage.removeItem("pending-state");
-    }catch(e){ return; } // still offline
+      synced = true;
+      setServerAvailable(true);
+    }catch(e){ setServerAvailable(false); return; }
   }
   const sprefs = localStorage.getItem("pending-settings");
   if(sprefs){
     try{
       await fetch("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:sprefs});
       localStorage.removeItem("pending-settings");
+      synced = true;
+    }catch(e){ return; }
+  }
+  const pratings = localStorage.getItem("pending-ratings");
+  if(pratings){
+    try{
+      await fetch("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:pratings});
+      localStorage.removeItem("pending-ratings");
+      synced = true;
     }catch(e){ return; }
   }
   pendingSave = false;
-  updateOnlineStatus();
-  showToast("✓ Back online — changes synced");
+  if(synced) showToast("✓ Changes synced to server");
 }
 
-window.addEventListener("online",  function(){ updateOnlineStatus(); flushPending(); });
+window.addEventListener("online",  function(){ updateOnlineStatus(); if(pendingSave) flushPending(); });
 window.addEventListener("offline", function(){ updateOnlineStatus(); });
 
 function saveState(){
   const body = JSON.stringify({liked:liked.map(function(n){return n.h}),skipped:Array.from(skipped)});
-  if(!navigator.onLine){
+  // Always write local backup
+  try{ localStorage.setItem("local-state", body); }catch(e){}
+  if(!navigator.onLine || !serverAvailable){
     try{ localStorage.setItem("pending-state", body); }catch(e){}
     pendingSave = true; updateOnlineStatus(); return;
   }
   fetch("/api/state",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .then(function(r){ if(!r.ok) throw new Error(r.status); setServerAvailable(true); })
     .catch(function(){
+      setServerAvailable(false);
       try{ localStorage.setItem("pending-state", body); }catch(e){}
-      pendingSave = true; updateOnlineStatus();
+      pendingSave = true;
     });
 }
 async function apiClear(){
   try{await fetch("/api/state",{method:"DELETE"})}catch(e){}
+  localStorage.removeItem("local-state");
+  localStorage.removeItem("pending-state");
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -339,15 +366,39 @@ function showToast(msg){
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
+async function fetchWithCache(url, cacheKey){
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    try{ localStorage.setItem(cacheKey, JSON.stringify(data)); }catch(e){}
+    setServerAvailable(true);
+    return data;
+  }catch(e){
+    setServerAvailable(false);
+    const cached = localStorage.getItem(cacheKey);
+    if(cached){
+      if(cacheKey === "cached-names") showToast("📦 Loaded from cache (offline)");
+      return JSON.parse(cached);
+    }
+    throw new Error("No cached data — open the app online first.");
+  }
+}
+
 async function init(){
-  // Fetch names + state in parallel
-  const [namesRes, stateRes] = await Promise.all([
-    fetch("/api/names"),
-    fetch("/api/state")
-  ]);
-  RAW = await namesRes.json();
-  const state = await stateRes.json();
-  // Build lookup map so we can restore full objects from saved name strings
+  let namesData, state;
+  try{
+    [namesData, state] = await Promise.all([
+      fetchWithCache("/api/names", "cached-names"),
+      fetchWithCache("/api/state", "local-state")
+    ]);
+  }catch(e){
+    document.getElementById("loading").innerHTML =
+      '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
+    return;
+  }
+
+  RAW = namesData;
   const nameMap = {};
   RAW.forEach(function(n){ nameMap[n.h] = n; });
   liked   = (state.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
@@ -581,13 +632,35 @@ var likedSort = 'order';
 var lpTab = 'saved';
 var skipQ = '';
 
-// ── Personal ratings (1–5 stars, localStorage only) ──────────────────
+// ── Personal ratings (1–5 stars, server + localStorage) ─────────────
 var ratings = {};
-function loadRatings(){
-  try{ ratings = JSON.parse(localStorage.getItem('name-ratings') || '{}'); }catch(e){ ratings={}; }
+async function loadRatings(){
+  // Try server first, fall back to localStorage
+  if(serverAvailable){
+    try{
+      const r = await fetch("/api/ratings");
+      if(!r.ok) throw new Error(r.status);
+      ratings = await r.json();
+      try{ localStorage.setItem("cached-ratings", JSON.stringify(ratings)); }catch(e){}
+      return;
+    }catch(e){ setServerAvailable(false); }
+  }
+  try{ ratings = JSON.parse(localStorage.getItem("cached-ratings") || "{}"); }catch(e){ ratings={}; }
 }
 function saveRatings(){
-  try{ localStorage.setItem('name-ratings', JSON.stringify(ratings)); }catch(e){}
+  const body = JSON.stringify(ratings);
+  try{ localStorage.setItem("cached-ratings", body); }catch(e){}
+  if(!navigator.onLine || !serverAvailable){
+    try{ localStorage.setItem("pending-ratings", body); }catch(e){}
+    pendingSave = true; return;
+  }
+  fetch("/api/ratings",{method:"POST",headers:{"Content-Type":"application/json"},body})
+    .then(function(r){ if(!r.ok) throw new Error(r.status); setServerAvailable(true); })
+    .catch(function(){
+      setServerAvailable(false);
+      try{ localStorage.setItem("pending-ratings", body); }catch(e){}
+      pendingSave = true;
+    });
 }
 function setRating(h, val){
   if(ratings[h] === val) delete ratings[h];   // tap same star → clear
@@ -854,8 +927,7 @@ function initSettings(){
 // ═══ FINAL INIT — everything defined above, safe to call now ═══
 (async function(){
   await init();
-  loadRatings();
-  await loadSettings();
+  await Promise.all([loadRatings(), loadSettings()]);
   initSettings();
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("/static/sw.js").catch(function(){});

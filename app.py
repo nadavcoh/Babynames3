@@ -84,6 +84,9 @@ def init_db():
     db.execute("""CREATE TABLE IF NOT EXISTS settings (
         user_id TEXT PRIMARY KEY, prefs TEXT NOT NULL DEFAULT '{}',
         updated DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    db.execute("""CREATE TABLE IF NOT EXISTS ratings (
+        user_id TEXT PRIMARY KEY, data TEXT NOT NULL DEFAULT '{}',
+        updated DATETIME DEFAULT CURRENT_TIMESTAMP)""")
     db.commit(); db.close()
 
 USER_ID = "default"
@@ -129,6 +132,22 @@ def save_settings():
         (USER_ID, json.dumps(merged)))
     db.commit()
     return jsonify({"ok": True, "settings": merged})
+
+# ─── RATINGS ───
+@app.route("/api/ratings", methods=["GET"])
+def get_ratings():
+    row = get_db().execute("SELECT data FROM ratings WHERE user_id=?", (USER_ID,)).fetchone()
+    return jsonify(json.loads(row["data"]) if row else {})
+
+@app.route("/api/ratings", methods=["POST"])
+def save_ratings():
+    d = request.get_json(force=True)
+    db = get_db()
+    db.execute("""INSERT INTO ratings(user_id,data) VALUES(?,?)
+        ON CONFLICT(user_id) DO UPDATE SET data=excluded.data,updated=CURRENT_TIMESTAMP""",
+        (USER_ID, json.dumps(d, ensure_ascii=False)))
+    db.commit()
+    return jsonify({"ok": True})
 
 # ─── NAMES DATA ───
 import functools
