@@ -105,6 +105,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .ski-del{background:var(--rol);color:var(--ro)}
 /* ── Rank badge on saved list items ── */
 .rank-pill{display:inline-block;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:8px;background:var(--skl);color:var(--sk);margin-top:3px}
+/* ── Star ratings ── */
+.stars{display:flex;gap:1px;margin-top:5px;cursor:default}
+.star{font-size:1.15rem;line-height:1;cursor:pointer;transition:transform .1s;-webkit-tap-highlight-color:transparent;user-select:none}
+.star:hover{transform:scale(1.25)}
+.li-stars-row{padding:0 14px 10px;display:flex;align-items:center;gap:8px}
+.stars-hint{font-size:.62rem;color:var(--mu)}
 .ll{padding:12px;display:flex;flex-direction:column;gap:10px}
 .li{background:white;border-radius:13px;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s}
 .li:hover{transform:translateY(-2px);box-shadow:0 5px 16px rgba(0,0,0,.1)}
@@ -218,8 +224,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="ph">
     <div class="pht" id="lp-title">&#10084;&#65039; Saved names</div>
     <div class="ph-btns">
-      <button class="btn-clear" id="btn-clear">Clear all</button>
-      <button class="pcl" id="btn-lclose">&#x2715;</button>
+<button class="pcl" id="btn-lclose">&#x2715;</button>
     </div>
   </div>
 
@@ -233,10 +238,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div id="lp-pane-saved">
     <div class="lp-sort">
       <span class="lp-sort-lbl">Sort:</span>
-      <button class="sb on" id="ls-order" onclick="setLikedSort('order')">Saved order</button>
-      <button class="sb"    id="ls-rk"    onclick="setLikedSort('rk')">Overall rank</button>
-      <button class="sb"    id="ls-r24"   onclick="setLikedSort('r24')">2024 rank</button>
-      <button class="sb"    id="ls-az"    onclick="setLikedSort('az')">A&#x2013;Z</button>
+      <button class="sb on" id="ls-order"  onclick="setLikedSort('order')">Saved order</button>
+      <button class="sb"    id="ls-myrank" onclick="setLikedSort('myrank')">&#11088; My rank</button>
+      <button class="sb"    id="ls-rk"     onclick="setLikedSort('rk')">Overall rank</button>
+      <button class="sb"    id="ls-r24"    onclick="setLikedSort('r24')">2024 rank</button>
+      <button class="sb"    id="ls-az"     onclick="setLikedSort('az')">A&#x2013;Z</button>
     </div>
     <div class="ll" id="ll"></div>
   </div>
@@ -355,7 +361,6 @@ async function init(){
   document.getElementById("btn-u").onclick=doUndo;
   document.getElementById("btn-picks").onclick=showLiked;
   document.getElementById("btn-lclose").onclick=hideLiked;
-  document.getElementById("btn-clear").onclick=clearAll;
   document.getElementById("skip-si").oninput=function(){skipQ=this.value;renderSkipped()};
   document.getElementById("si").oninput=function(){q=this.value;buildDeck()};
   document.getElementById("s-pop").onclick=function(){setSort("pop")};
@@ -387,10 +392,16 @@ function switchCat(id){cat=id;hist=[];buildTabs();buildDeck()}
 // ── Deck ─────────────────────────────────────────────────────────────────────
 function buildDeck(){
   const likedSet=new Set(liked.map(function(n){return n.h}));
+  const minT = (SETTINGS && SETTINGS.minTotal) ? SETTINGS.minTotal : 20;
   let src=RAW.filter(function(n){
     if(likedSet.has(n.h)||skipped.has(n.h))return false;
     if(cat!=="all"&&n.c!==cat)return false;
     if(q){const lq=q.toLowerCase();if(!n.h.includes(q)&&!n.h.toLowerCase().includes(lq))return false}
+    if(n.t < minT) return false;
+    if(n.c==="vintage" && SETTINGS.showVintage===false) return false;
+    if(n.c==="modern"  && SETTINGS.showModern ===false) return false;
+    if(n.c==="classic" && SETTINGS.showClassic===false) return false;
+    if(n.c==="unisex"  && SETTINGS.showUnisex ===false) return false;
     return true;
   });
   if(srt==="az")       src.sort(function(a,b){return a.h.localeCompare(b.h,"he")});
@@ -570,6 +581,21 @@ var likedSort = 'order';
 var lpTab = 'saved';
 var skipQ = '';
 
+// ── Personal ratings (1–5 stars, localStorage only) ──────────────────
+var ratings = {};
+function loadRatings(){
+  try{ ratings = JSON.parse(localStorage.getItem('name-ratings') || '{}'); }catch(e){ ratings={}; }
+}
+function saveRatings(){
+  try{ localStorage.setItem('name-ratings', JSON.stringify(ratings)); }catch(e){}
+}
+function setRating(h, val){
+  if(ratings[h] === val) delete ratings[h];   // tap same star → clear
+  else ratings[h] = val;
+  saveRatings();
+  renderLiked();
+}
+
 function showLiked(){
   document.getElementById('lp').classList.add('sh');
   renderLiked();
@@ -585,13 +611,12 @@ function switchLPTab(tab){
   document.getElementById('lp-pane-skipped').style.display = tab==='skipped' ? '' : 'none';
   document.getElementById('lp-title').innerHTML = tab==='saved'
     ? '&#10084;&#65039; Saved names' : '&#10006; Skipped names';
-  document.getElementById('btn-clear').style.display = tab==='saved' ? '' : 'none';
   if(tab==='skipped'){ renderSkipped(); document.getElementById('skip-si').focus(); }
 }
 
 function setLikedSort(s){
   likedSort = s;
-  ['order','rk','r24','az'].forEach(function(id){
+  ['order','myrank','rk','r24','az'].forEach(function(id){
     var el = document.getElementById('ls-'+id);
     if(el) el.classList.toggle('on', id===s);
   });
@@ -600,7 +625,11 @@ function setLikedSort(s){
 
 function sortedLiked(){
   var arr = liked.slice();
-  if(likedSort==='rk')       arr.sort(function(a,b){ return (a.rk||9999)-(b.rk||9999); });
+  if(likedSort==='myrank') arr.sort(function(a,b){
+    var ra = ratings[a.h] || 0, rb = ratings[b.h] || 0;
+    return rb - ra;   // 5 first, unrated (0) last
+  });
+  else if(likedSort==='rk')  arr.sort(function(a,b){ return (a.rk||9999)-(b.rk||9999); });
   else if(likedSort==='r24') arr.sort(function(a,b){
     if(!a.r24 && !b.r24) return 0;
     if(!a.r24) return 1; if(!b.r24) return -1;
@@ -608,6 +637,15 @@ function sortedLiked(){
   });
   else if(likedSort==='az')  arr.sort(function(a,b){ return a.h.localeCompare(b.h,'he'); });
   return arr;
+}
+
+function starsHTML(h){
+  var r = ratings[h] || 0;
+  var s = '';
+  for(var i=1;i<=5;i++){
+    s += '<span class="star" data-h="'+escH(h)+'" data-v="'+i+'">'+(i<=r?'\u2605':'\u2606')+'</span>';
+  }
+  return s;
 }
 
 function renderLiked(){
@@ -626,15 +664,14 @@ function renderLiked(){
     if(likedSort==='r24' && nm.r24) rankPill='<span class="rank-pill">#'+nm.r24+' in 2024</span>';
     var item=document.createElement('div');
     item.className='li';
-    item.innerHTML='<div class="lit">'
-      +'<div class="lin '+bigcls+'">'+escH(nm.h)+'</div>'
-      +'<div class="lim"><div class="lim-s">'+(CC[nm.c]||CC.classic).l+'</div>'
-      +'<div class="lis"><div class="li-st"><strong>'+fT(nm.t)+'</strong> total</div>'
-      +'<div class="li-st"><strong>'+nm.p+'</strong> peak</div>'
-      +'<div class="li-st"><strong>'+fR(nm.a)+'</strong> today</div></div>'
-      +(rankPill?'<div>'+rankPill+'</div>':'')+'</div>'
-      +'<div style="color:#ccc;font-size:1.1rem">\u203A</div></div>'
-      +'<div class="lic"><canvas id="'+cid+'" height="55"></canvas></div>';
+    item.innerHTML='<div class="lit">'      +'<div class="lin '+bigcls+'">'+escH(nm.h)+'</div>'      +'<div class="lim"><div class="lim-s">'+(CC[nm.c]||CC.classic).l+'</div>'      +'<div class="lis"><div class="li-st"><strong>'+fT(nm.t)+'</strong> total</div>'      +'<div class="li-st"><strong>'+nm.p+'</strong> peak</div>'      +'<div class="li-st"><strong>'+fR(nm.a)+'</strong> today</div></div>'      +(rankPill?'<div>'+rankPill+'</div>':'')+'</div>'      +'<div style="color:#ccc;font-size:1.1rem">\u203A</div></div>'      +'<div class="li-stars-row"><div class="stars">'+starsHTML(nm.h)+'</div>'      +'<span class="stars-hint">'+(ratings[nm.h]?'★'.repeat(ratings[nm.h]):'tap to rank')+'</span></div>'      +'<div class="lic"><canvas id="'+cid+'" height="55"></canvas></div>';
+    // Wire star clicks — stop propagation so card tap doesn't fire
+    item.querySelectorAll('.star').forEach(function(star){
+      star.addEventListener('click', function(e){
+        e.stopPropagation();
+        setRating(star.dataset.h, parseInt(star.dataset.v));
+      });
+    });
     item.onclick=(function(n){return function(){showDetail(n)}})(nm);
     list.appendChild(item);
     setTimeout((function(id,n,col){return function(){
@@ -733,7 +770,7 @@ function showDetail(nm){
 function hideDetail(){document.getElementById("dm").classList.remove("sh")}
 function removeLiked(nm){liked=liked.filter(function(n){return n!==nm});saveState();updateCounter();showToast("Removed from saved");renderLiked()}
 
-init();
+/* init() called after all code is defined — see bottom of script */
 
 
 // ═══ SETTINGS ═══
@@ -814,41 +851,18 @@ function initSettings(){
   };
 }
 
-// ═══ PATCH buildDeck to respect settings ═══
-const _origBuildDeck = buildDeck;
-buildDeck = function(){
-  const likedSet = new Set(liked.map(function(n){return n.h}));
-  let src = RAW.filter(function(n){
-    if(likedSet.has(n.h)) return false;
-    if(skipped.has(n.h))  return false;
-    if((SETTINGS.minTotal||20) > n.t) return false;
-    if(n.c==="vintage" && SETTINGS.showVintage===false) return false;
-    if(n.c==="modern"  && SETTINGS.showModern ===false) return false;
-    if(n.c==="classic" && SETTINGS.showClassic===false) return false;
-    if(n.c==="unisex"  && SETTINGS.showUnisex ===false) return false;
-    return true;
-  });
-  if(srt==="az")      src.sort(function(a,b){return a.h.localeCompare(b.h,"he")});
-  else if(srt==="pk") src.sort(function(a,b){return b.p-a.p});
-  else if(srt==="rd") src.sort(function(){return Math.random()-.5});
-  else                src.sort(function(a,b){return b.t-a.t});
-  deck = src;
-  renderDeck();
-};
-
-// ═══ PATCH init to load settings too ═══
-const _origInit = init;
-init = async function(){
-  await _origInit();
+// ═══ FINAL INIT — everything defined above, safe to call now ═══
+(async function(){
+  await init();
+  loadRatings();
   await loadSettings();
   initSettings();
-  // Register service worker
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("/static/sw.js").catch(function(){});
   }
   updateOnlineStatus();
   if(pendingSave && navigator.onLine) flushPending();
-};
+})();
 
 </script>
 
