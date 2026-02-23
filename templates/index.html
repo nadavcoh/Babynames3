@@ -286,10 +286,10 @@ let serverAvailable = true;  // proven false on first failed fetch
 // Timeout-aware fetch — rejects after ms milliseconds
 function fetchWithTimeout(url, opts, ms){
   ms = ms || 6000;
-  var ctrl = new AbortController();
-  var tid = setTimeout(function(){ ctrl.abort(); }, ms);
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
   return fetch(url, Object.assign({}, opts, {signal: ctrl.signal}))
-    .finally(function(){ clearTimeout(tid); });
+    .finally(() => clearTimeout(tid));
 }
 
 function setServerAvailable(v){
