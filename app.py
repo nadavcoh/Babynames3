@@ -24,7 +24,7 @@ def get_version():
 APP_VERSION = get_version()  # computed once at startup
 
 # ─── GITHUB WEBHOOK (auto-deploy on push) ─────────────────────────────────────
-import hmac, hashlib, subprocess, threading
+import hmac, hashlib, threading
 
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
