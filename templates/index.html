@@ -964,7 +964,7 @@ function initSettings(){
       try{
         var r = await fetchWithTimeout("/api/state", {method:"HEAD"}, 4000);
         if(r.ok) setServerAvailable(true);
-      }catch(e){}
+      }catch(e){ console.error("Server re-check failed:", e); }
     }
   }, 30000);
 
