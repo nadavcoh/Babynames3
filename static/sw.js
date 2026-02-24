@@ -52,7 +52,7 @@ self.addEventListener("fetch", e => {
         fetch(e.request).then(res => {
           if (res && res.status === 200)
             caches.open(CACHE).then(c => c.put(e.request, res));
-        }).catch(() => {});
+        }).catch(err => { console.error('SW background fetch failed:', err); });
         return cached;
       }
       return fetch(e.request).then(res => {
