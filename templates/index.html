@@ -960,6 +960,31 @@ function initSettings(){
   }
   updateOnlineStatus();
   if(pendingSave && navigator.onLine) flushPending();
+
+  // Periodic server re-check: when server was unavailable, retry every 30s
+  setInterval(async function(){
+    if(navigator.onLine && !serverAvailable){
+      try{
+        var r = await fetchWithTimeout("/api/state", {method:"HEAD"}, 4000);
+        if(r.ok) setServerAvailable(true);  // triggers flushPending via setServerAvailable
+      }catch(e){}
+    }
+  }, 30000);
+
+  // Show version in settings panel
+  try{
+    var vr = await fetchWithTimeout("/api/version", {}, 3000);
+    if(vr.ok){
+      var vd = await vr.json();
+      var vel = document.getElementById("app-version");
+      if(vel) vel.textContent = vd.version;
+    }
+  }catch(e){}
+  // HTTPS / PWA warning
+  var swOk = "serviceWorker" in navigator && location.protocol === "https:";
+  var pwel = document.getElementById("pwa-status");
+  if(pwel) pwel.textContent = swOk ? "✓ HTTPS — offline mode active" : "⚠ HTTP only — offline mode unavailable (use HTTPS)";
+  if(pwel) pwel.style.color = swOk ? "var(--sg)" : "var(--ro)";
 })();
 
 </script>
@@ -1024,6 +1049,11 @@ function initSettings(){
         <button class="sp-danger-btn" id="sp-clear-skipped" style="background:#e8f3ec;color:var(--sg)">Re-show skipped</button>
         <button class="sp-danger-btn" id="sp-clear-all"     style="background:var(--rol);color:var(--ro)">Clear everything</button>
       </div>
+    </div>
+
+    <div style="padding:14px 18px 4px;font-size:.68rem;color:var(--mu)">
+      <div id="pwa-status" style="margin-bottom:4px"></div>
+      <div>Version: <span id="app-version">—</span></div>
     </div>
 
   </div>
