@@ -268,7 +268,7 @@ if __name__ == "__main__":
     args = p.parse_args()
     init_db()
     try: local_ip = socket.gethostbyname(socket.gethostname())
-    except: local_ip = "?.?.?.?"
+    except socket.gaierror: local_ip = "?.?.?.?"
     scheme = "https" if args.cert else "http"
     print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer  [{APP_VERSION}]")
     print(f"  Local:    {scheme}://localhost:{args.port}")
