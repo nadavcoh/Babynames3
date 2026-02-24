@@ -18,7 +18,7 @@ def get_version():
             ["git", "-C", app_dir, "log", "-1", "--format=%cd", "--date=short"],
             stderr=subprocess.DEVNULL).decode().strip()
         return f"{sha} ({date})"
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return "dev"
 
 APP_VERSION = get_version()  # computed once at startup
