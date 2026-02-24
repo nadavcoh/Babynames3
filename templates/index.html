@@ -948,6 +948,52 @@ function initSettings(){
     try{ await fetch("/api/state",{method:"DELETE"}); }catch(e){}
     liked=[];skipped=new Set();hist=[];updateCounter();buildDeck();closeSettings();showToast("Cleared");
   };
+
+  document.getElementById("btn-deploy").onclick = async function(){
+    var btn = this;
+    var status = document.getElementById("deploy-status");
+    btn.disabled = true;
+    btn.textContent = "Deploying…";
+    status.textContent = "";
+    status.style.color = "var(--mu)";
+    try{
+      var r = await fetchWithTimeout("/webhook", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-GitHub-Event":"push"},
+        body: "{}"
+      }, 10000);
+      var d = await r.json();
+      if(r.ok && d.ok){
+        status.textContent = "✓ Deploy triggered — server will restart in a moment";
+        status.style.color = "var(--sg)";
+        // Refresh version after restart (poll for 20s)
+        var tries = 0;
+        var poll = setInterval(async function(){
+          tries++;
+          try{
+            var vr = await fetchWithTimeout("/api/version", {}, 3000);
+            if(vr.ok){
+              var vd = await vr.json();
+              var vel = document.getElementById("app-version");
+              if(vel) vel.textContent = vd.version;
+              status.textContent = "✓ Updated to " + vd.version;
+              clearInterval(poll);
+            }
+          }catch(e){}
+          if(tries > 10) clearInterval(poll);
+        }, 2000);
+      } else {
+        status.textContent = "⚠ Server error: " + (d.error || r.status);
+        status.style.color = "var(--ro)";
+      }
+    }catch(err){
+      status.textContent = "⚠ Could not reach server: " + err.message;
+      status.style.color = "var(--ro)";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "⇅ Deploy latest update";
+    }
+  };
 }
 
 // ═══ FINAL INIT — everything defined above, safe to call now ═══
@@ -1065,6 +1111,16 @@ function initSettings(){
       <div class="sp-danger">
         <button class="sp-danger-btn" id="sp-clear-skipped" style="background:#e8f3ec;color:var(--sg)">Re-show skipped</button>
         <button class="sp-danger-btn" id="sp-clear-all"     style="background:var(--rol);color:var(--ro)">Clear everything</button>
+      </div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Server</div>
+      <div style="padding:14px 18px">
+        <button class="sp-danger-btn" id="btn-deploy" style="width:100%;background:var(--skl);color:var(--sk)">
+          &#8645; Deploy latest update
+        </button>
+        <div id="deploy-status" style="font-size:.7rem;color:var(--mu);margin-top:8px;min-height:1.2em;text-align:center"></div>
       </div>
     </div>
 
