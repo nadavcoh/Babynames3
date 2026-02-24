@@ -955,36 +955,53 @@ function initSettings(){
   await init();
   await Promise.all([loadRatings(), loadSettings()]);
   initSettings();
-  if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("/static/sw.js").catch(function(){});
-  }
   updateOnlineStatus();
   if(pendingSave && navigator.onLine) flushPending();
 
-  // Periodic server re-check: when server was unavailable, retry every 30s
+  // Periodic server re-check: retry every 30s when server was unavailable
   setInterval(async function(){
     if(navigator.onLine && !serverAvailable){
       try{
         var r = await fetchWithTimeout("/api/state", {method:"HEAD"}, 4000);
-        if(r.ok) setServerAvailable(true);  // triggers flushPending via setServerAvailable
+        if(r.ok) setServerAvailable(true);
       }catch(e){ console.error("Server re-check failed:", e); }
     }
   }, 30000);
 
-  // Show version in settings panel
+  // Show version
   try{
     var vr = await fetchWithTimeout("/api/version", {}, 3000);
-    if(vr.ok){
-      var vd = await vr.json();
-      var vel = document.getElementById("app-version");
-      if(vel) vel.textContent = vd.version;
-    }
+    if(vr.ok){ var vd = await vr.json(); var vel = document.getElementById("app-version"); if(vel) vel.textContent = vd.version; }
   }catch(e){ console.error("Failed to fetch app version:", e); }
-  // HTTPS / PWA warning
-  var swOk = "serviceWorker" in navigator && location.protocol === "https:";
+
+  // Service worker: register and report real activation state
   var pwel = document.getElementById("pwa-status");
-  if(pwel) pwel.textContent = swOk ? "✓ HTTPS — offline mode active" : "⚠ HTTP only — offline mode unavailable (use HTTPS)";
-  if(pwel) pwel.style.color = swOk ? "var(--sg)" : "var(--ro)";
+  if(!("serviceWorker" in navigator)){
+    if(pwel){ pwel.textContent = "\u2717 Service workers not supported"; pwel.style.color = "var(--ro)"; }
+  } else if(location.protocol !== "https:" && location.hostname !== "localhost"){
+    if(pwel){ pwel.textContent = "\u26a0 HTTP \u2014 offline needs HTTPS (run with --cert/--key)"; pwel.style.color = "var(--ro)"; }
+  } else {
+    try{
+      var reg = await navigator.serviceWorker.register("/static/sw.js");
+      // Wait up to 4s for SW to activate (first install takes a moment)
+      await new Promise(function(resolve){
+        if(reg.active){ resolve(); return; }
+        var sw = reg.installing || reg.waiting;
+        if(sw) sw.addEventListener("statechange", function(){ if(sw.state === "activated") resolve(); });
+        else navigator.serviceWorker.addEventListener("controllerchange", resolve);
+        setTimeout(resolve, 4000);
+      });
+      var active = !!navigator.serviceWorker.controller;
+      if(pwel){
+        pwel.textContent = active
+          ? "\u2713 Offline mode ready"
+          : "\u23f3 Activating\u2026 reload once to finish";
+        pwel.style.color = active ? "var(--sg)" : "var(--mu)";
+      }
+    }catch(err){
+      if(pwel){ pwel.textContent = "\u2717 SW error: " + err.message; pwel.style.color = "var(--ro)"; }
+    }
+  }
 })();
 
 </script>
