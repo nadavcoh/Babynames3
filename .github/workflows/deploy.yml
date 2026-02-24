@@ -16,13 +16,31 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:github-actions
 
-      - name: Trigger Deployment Webhook and Inspect Response
-        id: deployment-step
+      - name: Trigger deployment webhook (https with http fallback)
         run: |
-          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -H "X-GitHub-Event: push" -d '{}' http://hamusim.puma-kettle.ts.net:5003/webhook)
-          echo "HTTP Response: $RESPONSE"
-          cat response.json
-          if [ "$RESPONSE" -ne 200 ]; then
-            echo "Deployment failed. Server returned status code $RESPONSE" >&2
-            exit 1
+          HOST="hamusim.puma-kettle.ts.net"
+          PORT="5003"
+          HEADERS='-H "Content-Type: application/json" -H "X-GitHub-Event: push"'
+          DATA='{}'
+          CURL_OPTS="-s -o response.json -w %{http_code} -X POST -d '$DATA' $HEADERS --max-time 15"
+
+          echo "Trying HTTPS..."
+          CODE=$(curl $CURL_OPTS "https://$HOST:$PORT/webhook" 2>/dev/null) || CODE=""
+
+          if [ "$CODE" = "200" ]; then
+            echo "HTTPS deploy succeeded (HTTP $CODE)"
+          else
+            echo "HTTPS failed (code='$CODE'), falling back to HTTP..."
+            CODE=$(curl $CURL_OPTS "http://$HOST:$PORT/webhook" 2>/dev/null) || CODE=""
+            if [ "$CODE" = "200" ]; then
+              echo "HTTP deploy succeeded (HTTP $CODE)"
+            else
+              echo "Both HTTPS and HTTP failed. Last status code: $CODE"
+              echo "Server response:"
+              cat response.json 2>/dev/null || true
+              exit 1
+            fi
           fi
+
+          echo "Server response:"
+          cat response.json
