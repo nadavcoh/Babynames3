@@ -972,7 +972,7 @@ function initSettings(){
   try{
     var vr = await fetchWithTimeout("/api/version", {}, 3000);
     if(vr.ok){ var vd = await vr.json(); var vel = document.getElementById("app-version"); if(vel) vel.textContent = vd.version; }
-  }catch(e){}
+  }catch(e){ console.error("Failed to fetch app version:", e); }
 
   // Service worker: register and report real activation state
   var pwel = document.getElementById("pwa-status");
