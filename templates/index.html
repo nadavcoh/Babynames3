@@ -979,7 +979,7 @@ function initSettings(){
       var vel = document.getElementById("app-version");
       if(vel) vel.textContent = vd.version;
     }
-  }catch(e){}
+  }catch(e){ console.error("Failed to fetch app version:", e); }
   // HTTPS / PWA warning
   var swOk = "serviceWorker" in navigator && location.protocol === "https:";
   var pwel = document.getElementById("pwa-status");
