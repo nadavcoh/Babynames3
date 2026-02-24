@@ -101,11 +101,38 @@ key: ${{ secrets.DEV_SSH_KEY }}
 ## Running
 
 ```bat
-run.bat                          :: localhost:5000
-run.bat --host 0.0.0.0           :: all interfaces (Tailscale reachable)
-run.bat --host 0.0.0.0 --debug   :: with auto-reload
-deploy.bat                       :: pull + restart (run manually if needed)
+run.bat                                           :: HTTP (no PWA offline)
+run.bat --cert HOST.crt --key HOST.key            :: HTTPS (enables PWA offline)
+run.bat --host 0.0.0.0 --debug                    :: with auto-reload
+deploy.bat                                        :: pull + restart
 ```
+
+---
+
+## PWA offline support (requires HTTPS)
+
+Service workers — which cache the app for offline use — **only work over HTTPS** (browsers block them on plain HTTP). To enable full offline support:
+
+### Option A: Tailscale certificate (recommended)
+
+Tailscale provides free, real TLS certificates for any machine on your tailnet.
+
+```powershell
+# 1. Generate cert for your Tailscale hostname (e.g. mypc.tail-abc.ts.net)
+tailscale cert mypc.tail-abc.ts.net
+
+# 2. Run the app with HTTPS
+run.bat --cert mypc.tail-abc.ts.net.crt --key mypc.tail-abc.ts.net.key
+
+# 3. Access the app at:
+#    https://mypc.tail-abc.ts.net:5003
+```
+
+After the first successful HTTPS load, the service worker caches the entire app — subsequent loads work even when the server is off.
+
+### Option B: Local network only (HTTP)
+
+The app still works on HTTP — it uses `localStorage` fallbacks for all data. But the page itself can't load when the server is down since there's no service worker cache.
 
 ---
 
@@ -121,6 +148,7 @@ deploy.bat                       :: pull + restart (run manually if needed)
 | POST | `/api/settings` | Save preferences |
 | GET | `/api/ratings` | Star ratings |
 | POST | `/api/ratings` | Save star ratings |
+| GET | `/api/version` | Git version (hash + date) |
 
 ---
 

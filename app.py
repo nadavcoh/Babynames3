@@ -1,14 +1,30 @@
 #!/usr/bin/env python3
 """שם טוב — Name Explorer · Flask backend"""
 
-import json, sqlite3, os, argparse, socket, sys
+import json, sqlite3, os, argparse, socket, sys, subprocess
 from flask import Flask, request, jsonify, render_template, g, send_from_directory
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "shem_tov.db")
 
+def get_version():
+    """Return short git hash + date, or 'dev' if git unavailable."""
+    try:
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        sha = subprocess.check_output(
+            ["git", "-C", app_dir, "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL).decode().strip()
+        date = subprocess.check_output(
+            ["git", "-C", app_dir, "log", "-1", "--format=%cd", "--date=short"],
+            stderr=subprocess.DEVNULL).decode().strip()
+        return f"{sha} ({date})"
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "dev"
+
+APP_VERSION = get_version()  # computed once at startup
+
 # ─── GITHUB WEBHOOK (auto-deploy on push) ─────────────────────────────────────
-import hmac, hashlib, subprocess, threading
+import hmac, hashlib, threading
 
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
@@ -95,6 +111,10 @@ DEFAULTS = {
     "showModern": True, "showClassic": True, "cardTheme": "warm",
     "showDaughters": True,
 }
+
+@app.route("/api/version")
+def get_version_route():
+    return jsonify({"version": APP_VERSION})
 
 # ─── STATE ───
 @app.route("/api/state", methods=["GET"])
@@ -243,11 +263,15 @@ if __name__ == "__main__":
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=5003)
     p.add_argument("--debug", action="store_true")
+    p.add_argument("--cert", default="", help="Path to TLS certificate file (e.g. from tailscale cert)")
+    p.add_argument("--key",  default="", help="Path to TLS private key file")
     args = p.parse_args()
     init_db()
     try: local_ip = socket.gethostbyname(socket.gethostname())
-    except: local_ip = "?.?.?.?"
-    print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer")
-    print(f"  Local:    http://localhost:{args.port}")
-    print(f"  Network:  http://{local_ip}:{args.port}\n")
-    app.run(host=args.host, port=args.port, debug=True)
+    except socket.gaierror: local_ip = "?.?.?.?"
+    scheme = "https" if args.cert else "http"
+    print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer  [{APP_VERSION}]")
+    print(f"  Local:    {scheme}://localhost:{args.port}")
+    print(f"  Network:  {scheme}://{local_ip}:{args.port}\n")
+    ssl_ctx = (args.cert, args.key) if args.cert and args.key else None
+    app.run(host=args.host, port=args.port, debug=args.debug, ssl_context=ssl_ctx)
