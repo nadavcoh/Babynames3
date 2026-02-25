@@ -37,6 +37,7 @@ def run(*cmd, cwd=None):
     r = subprocess.run(list(cmd), cwd=cwd, capture_output=True, text=True)
     if r.returncode != 0:
         die((r.stderr or r.stdout or f"{cmd[0]} failed").strip())
+    print(r.stdout.strip())
     return r.stdout.strip()
 
 # ── Validate ──────────────────────────────────────────────────────────────────
@@ -116,43 +117,8 @@ run("lg2", "commit", "-m", PR_TITLE,
     cwd=WORK_DIR)
 
 # ── Push ──────────────────────────────────────────────────────────────────────
-# Always set the authenticated remote URL before pushing so lg2 uses the token.
-print(f"→ Setting authenticated remote...")
-run("lg2", "remote", "set-url", "origin", AUTHED, cwd=WORK_DIR)
-
 print(f"→ Pushing branch {BRANCH} to origin...")
-# Try with --set-upstream first; fall back to bare push if lg2 doesn't support it.
-try:
-    run("lg2", "push", "--set-upstream", "origin", BRANCH, cwd=WORK_DIR)
-except SystemExit:
-    # If --set-upstream failed, try plain push
-    run("lg2", "push", "origin", BRANCH, cwd=WORK_DIR)
-
-# Verify branch actually landed on GitHub before creating PR (retry up to 10s)
-print("→ Verifying branch on GitHub...")
-branch_url = f"https://api.github.com/repos/{GITHUB_REPO}/branches/{BRANCH}"
-branch_req = urllib.request.Request(branch_url, headers={
-    "Authorization": f"Bearer {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-})
-for attempt in range(5):
-    try:
-        with urllib.request.urlopen(branch_req) as r:
-            if r.status == 200:
-                print(f"  ✓ Branch confirmed on GitHub (attempt {attempt+1})")
-                break
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            if attempt < 4:
-                print(f"  Branch not found yet, waiting... ({attempt+1}/5)")
-                time.sleep(2)
-                continue
-            die("Push appeared to succeed but branch is not visible on GitHub.\n"
-                "  Check that your GITHUB_TOKEN has 'repo' scope and can push to this repo.")
-        die(f"GitHub API error checking branch: {e}")
-    except Exception as e:
-        die(f"Error verifying branch: {e}")
+run("lg2", "push", "origin", BRANCH, cwd=WORK_DIR)
 
 # ── Open PR ───────────────────────────────────────────────────────────────────
 print("→ Creating PR...")
