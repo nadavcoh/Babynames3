@@ -8,7 +8,7 @@ Config file: ~/Documents/deploy_config.txt
   GITHUB_REPO=nadavcoh/Babynames3
 """
 
-import os, sys, subprocess, tarfile, shutil, json, urllib.request, urllib.error
+import os, sys, subprocess, tarfile, shutil, json, time, urllib.request, urllib.error
 from datetime import datetime
 
 # ── Load config from file (no env vars / shell needed) ───────────────────────
@@ -37,6 +37,7 @@ def run(*cmd, cwd=None):
     r = subprocess.run(list(cmd), cwd=cwd, capture_output=True, text=True)
     if r.returncode != 0:
         die((r.stderr or r.stdout or f"{cmd[0]} failed").strip())
+    print(r.stdout.strip())
     return r.stdout.strip()
 
 # ── Validate ──────────────────────────────────────────────────────────────────
@@ -116,8 +117,8 @@ run("lg2", "commit", "-m", PR_TITLE,
     cwd=WORK_DIR)
 
 # ── Push ──────────────────────────────────────────────────────────────────────
-print(f"→ Pushing...")
-run("lg2", "push", cwd=WORK_DIR)
+print(f"→ Pushing branch {BRANCH} to origin...")
+run("lg2", "push", "origin", BRANCH, cwd=WORK_DIR)
 
 # ── Open PR ───────────────────────────────────────────────────────────────────
 print("→ Creating PR...")
@@ -139,7 +140,14 @@ try:
     with urllib.request.urlopen(req) as resp:
         pr_url = json.loads(resp.read())["html_url"]
 except urllib.error.HTTPError as e:
-    die(f"GitHub API: {json.loads(e.read()).get('message', str(e))}")
+    body = json.loads(e.read())
+    msg  = body.get("message", str(e))
+    errs = body.get("errors", [])
+    detail = "; ".join(
+        err.get("message", str(err)) if isinstance(err, dict) else str(err)
+        for err in errs
+    )
+    die(f"GitHub API: {msg}" + (f" — {detail}" if detail else ""))
 
 run("lg2", "checkout", "main", cwd=WORK_DIR)
 print(f"\n✓ Done! Opening PR...")
