@@ -78,7 +78,7 @@ lg2 commit -m "$PR_TITLE" \
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 echo "→ Pushing $BRANCH..."
-lg2 push "$AUTHED_REMOTE" "$BRANCH"
+lg2 push
 
 # ── Create PR via GitHub API ──────────────────────────────────────────────────
 echo "→ Opening pull request..."
