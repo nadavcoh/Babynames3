@@ -118,7 +118,7 @@ run("lg2", "commit", "-m", PR_TITLE,
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 print(f"→ Pushing branch {BRANCH} to origin...")
-run("lg2", "push", "origin", BRANCH, cwd=WORK_DIR)
+run("lg2", "push", cwd=WORK_DIR)
 
 # ── Open PR ───────────────────────────────────────────────────────────────────
 print("→ Creating PR...")
