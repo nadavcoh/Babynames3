@@ -1062,7 +1062,6 @@ function getNlpFiltered(){
     return true;
   }).sort(function(a,b){
     // Sort: search results by rank, otherwise by overall rank
-    if(q) return (a.rk || 9999) - (b.rk || 9999);
     return (a.rk || 9999) - (b.rk || 9999);
   });
 }
