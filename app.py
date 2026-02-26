@@ -255,6 +255,15 @@ def apply_patch():
 @app.route("/static/<path:path>")
 def static_files(path): return send_from_directory("static", path)
 
+@app.after_request
+def add_custom_headers(response):
+    # Check if the request is for your specific file
+    if request.path == '/static/sw.js':
+        response.headers['Service-worker-allowed'] = '/'
+    if request.path == '/static/offline/scripts/service-worker.js':
+        response.headers['Service-worker-allowed'] = '/static/offline/'
+    return response
+
 @app.route("/")
 def index(): return render_template("index.html")
 
