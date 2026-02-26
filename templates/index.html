@@ -1191,7 +1191,7 @@ function showDetailFromList(nm){
     if(pwel){ pwel.textContent = "\u26a0 HTTP \u2014 offline needs HTTPS (run with --cert/--key)"; pwel.style.color = "var(--ro)"; }
   } else {
     try{
-      var reg = await navigator.serviceWorker.register("/static/sw.js");
+      var reg = await navigator.serviceWorker.register("/static/sw.js", {scope:"/"});
       // Wait up to 4s for SW to activate (first install takes a moment)
       await new Promise(function(resolve){
         if(reg.active){ resolve(); return; }
