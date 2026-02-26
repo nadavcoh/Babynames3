@@ -16,41 +16,99 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:github-actions
 
-      - name: Trigger deployment webhook (https with http fallback)
+      - name: Trigger deployment webhook
+        env:
+          SERVER_CERT: ${{ secrets.SERVER_CERT }}
         run: |
           HOST="hamusim.puma-kettle.ts.net"
           PORT="5003"
+          HTTPS_URL="https://$HOST:$PORT/webhook"
+          HTTP_URL="http://$HOST:$PORT/webhook"
+
+          echo "════════════════════════════════════════"
+          echo " שם טוב — Deploy webhook"
+          echo "════════════════════════════════════════"
+          echo " Host : $HOST"
+          echo " Port : $PORT"
+          echo " Time : $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "════════════════════════════════════════"
+          echo ""
+
+          # SERVER_CERT secret is required — fail fast if missing
+          if [ -z "$SERVER_CERT" ]; then
+            echo "ERROR: SERVER_CERT secret is not set."
+            echo "Add your self-signed certificate PEM to:"
+            echo "  GitHub repo → Settings → Secrets → Actions → SERVER_CERT"
+            exit 1
+          fi
+
+          echo "$SERVER_CERT" > /tmp/server.crt
+          echo "TLS : Using SERVER_CERT secret for certificate verification"
+          echo ""
 
           do_curl() {
             local url="$1"
-            curl -s \
-              -o response.json \
+            local scheme="$2"
+
+            echo "──────────────────────────────────────────"
+            echo "Attempting $scheme: $url"
+            echo "──────────────────────────────────────────"
+
+            HTTP_CODE=$(curl \
+              --verbose \
+              --stderr curl_verbose.txt \
+              -o response_body.txt \
               -w "%{http_code}" \
               -X POST \
               -H "Content-Type: application/json" \
               -H "X-GitHub-Event: push" \
               -d '{}' \
-              --max-time 15 \
-              "$url" 2>/dev/null
+              --max-time 20 \
+              --cacert /tmp/server.crt \
+              "$url") || HTTP_CODE="CURL_ERROR_$?"
+
+            echo ""
+            echo "── curl verbose output ──"
+            cat curl_verbose.txt || true
+            echo ""
+            echo "── response body ──"
+            cat response_body.txt || true
+            echo ""
+            echo "── HTTP status code: $HTTP_CODE ──"
+            echo ""
+
+            echo "$HTTP_CODE"
           }
 
-          echo "Trying HTTPS..."
-          CODE=$(do_curl "https://$HOST:$PORT/webhook") || CODE=""
+          # ── Try HTTPS ────────────────────────────────────────────────────
+          echo "STEP 1: Trying HTTPS..."
+          CODE=$(do_curl "$HTTPS_URL" "HTTPS")
 
           if [ "$CODE" = "200" ]; then
-            echo "HTTPS deploy succeeded (HTTP $CODE)"
-          else
-            echo "HTTPS failed (code='$CODE'), falling back to HTTP..."
-            CODE=$(do_curl "http://$HOST:$PORT/webhook") || CODE=""
-            if [ "$CODE" = "200" ]; then
-              echo "HTTP deploy succeeded (HTTP $CODE)"
-            else
-              echo "Both HTTPS and HTTP failed. Last status code: $CODE"
-              echo "Server response:"
-              cat response.json 2>/dev/null || true
-              exit 1
-            fi
+            echo "✓ HTTPS deploy succeeded (HTTP $CODE)"
+            exit 0
           fi
 
-          echo "Server response:"
-          cat response.json
+          echo "✗ HTTPS failed (code='$CODE')"
+          echo ""
+
+          # ── Fall back to HTTP ────────────────────────────────────────────
+          echo "STEP 2: Falling back to HTTP..."
+          CODE=$(do_curl "$HTTP_URL" "HTTP")
+
+          if [ "$CODE" = "200" ]; then
+            echo "✓ HTTP deploy succeeded (HTTP $CODE)"
+            exit 0
+          fi
+
+          echo "✗ HTTP also failed (code='$CODE')"
+          echo ""
+          echo "════════════════════════════════════════"
+          echo " DEPLOYMENT FAILED"
+          echo " Check that:"
+          echo "   1. Tailscale is running on the server"
+          echo "   2. Flask is running (python app.py)"
+          echo "   3. Port $PORT is correct"
+          echo "   4. SERVER_CERT matches the server's certificate"
+          echo "════════════════════════════════════════"
+          exit 1
