@@ -437,12 +437,27 @@ async function fetchWithCache(url, cacheKey){
   }
 }
 
+async function syncFromServer(){
+  // Background sync — does not block the main init() return
+  try{
+    await fetchWithTimeout("/api/state", {method:"HEAD"}, 2000);
+    setServerAvailable(true);
+    const r = await fetchWithTimeout("/api/state", {}, 4000);
+    if(r.ok){
+      const s = await r.json();
+      try{ localStorage.setItem("local-state", JSON.stringify(s)); }catch(e){}
+    }
+  }catch(e){
+    setServerAvailable(false);
+  }
+}
+
 async function init(){
   const cachedNames = localStorage.getItem("cached-names");
   const cachedState = localStorage.getItem("local-state");
 
   if(cachedNames && cachedState){
-    // ── Cache-first: show app instantly, sync server in background ──
+    // ── Cache-first: boot instantly, sync server without blocking ──
     let namesData, state;
     try{
       namesData = JSON.parse(cachedNames);
@@ -452,27 +467,8 @@ async function init(){
     }
 
     if(namesData && state){
-      // Boot immediately from cache
       bootApp(namesData, state);
-
-      // Try server in background with short timeout
-      try{
-        const r = await fetchWithTimeout("/api/state", {method:"HEAD"}, 2000);
-        setServerAvailable(true);
-        // Server is up — refresh state silently (names rarely change)
-        const freshState = await fetchWithTimeout("/api/state", {}, 4000);
-        if(freshState.ok){
-          const s = await freshState.json();
-          const nameMap = {};
-          RAW.forEach(function(n){ nameMap[n.h] = n; });
-          liked   = (s.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
-          skipped = new Set(s.skipped || []);
-          updateCounter();
-          buildDeck();
-        }
-      }catch(e){
-        setServerAvailable(false);
-      }
+      syncFromServer();  // fire-and-forget — init() returns immediately
       return;
     }
   }
@@ -496,11 +492,10 @@ async function init(){
       '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
     return;
   }
-  if(!serverAvailable) showToast("📦 Server unavailable — some features limited");
+  if(!serverAvailable) showToast("📦 Loaded from cache — server unavailable");
 
   bootApp(namesData, state);
 }
-
 function bootApp(namesData, state){
   RAW = namesData;
   const nameMap = {};

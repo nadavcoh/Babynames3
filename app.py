@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """שם טוב — Name Explorer · Flask backend"""
 
-import json, sqlite3, os, argparse, socket, sys, subprocess
+import json, sqlite3, os, argparse, socket, sys, subprocess, signal
 from flask import Flask, request, jsonify, render_template, g, send_from_directory
 from datetime import datetime
 
@@ -285,4 +285,14 @@ if __name__ == "__main__":
     print(f"  Network:      {scheme}://{local_ip}:{args.port}")
     print(f"  Current time: {datetime.now()}\n")
     ssl_ctx = (args.cert, args.key) if args.cert and args.key else None
-    app.run(host=args.host, port=args.port, debug=args.debug, ssl_context=ssl_ctx)
+    # Ensure Ctrl+C works whether or not debug mode is on.
+    # Without this, Werkzeug's threaded server can swallow SIGINT.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    app.run(
+        host=args.host,
+        port=args.port,
+        debug=args.debug,
+        use_reloader=args.debug,   # reloader only in debug; avoids double-process confusion
+        threaded=True,
+        ssl_context=ssl_ctx,
+    )
