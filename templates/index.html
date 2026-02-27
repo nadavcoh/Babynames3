@@ -223,7 +223,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     <button id="btn-settings" title="Settings" style="width:34px;height:34px;border-radius:50%;border:1.5px solid #c8c0b4;background:white;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;">&#9881;&#65039;</button>
   </div>
 </header>
-<div class="sw" style="position:relative"><span class="si-ico">&#128269;</span><input class="si" id="si" placeholder="Search names..." autocomplete="off" autocorrect="off" spellcheck="false"><button class="si-clr" id="si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button></div>
+<div class="sw"><div style="position:relative"><span class="si-ico">&#128269;</span><input class="si" id="si" placeholder="Search names..." autocomplete="off" autocorrect="off" spellcheck="false"><button class="si-clr" id="si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button></div></div>
 <div class="sm" id="sm"></div>
 <div class="tabs" id="tabs"></div>
 <div class="sr">
@@ -281,9 +281,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <!-- ── Skipped pane ── -->
   <div id="lp-pane-skipped" style="display:none">
     <div class="sk-wrap">
-      <span class="sk-ico">&#128269;</span>
-      <input class="sk-si" id="skip-si" placeholder="Search skipped names…" autocomplete="off" autocorrect="off" spellcheck="false">
-      <button class="si-clr" id="skip-si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button>
+      <div style="position:relative">
+        <span class="sk-ico">&#128269;</span>
+        <input class="sk-si" id="skip-si" placeholder="Search skipped names…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="si-clr" id="skip-si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button>
+      </div>
     </div>
     <div class="ll" id="ll-skipped"></div>
   </div>
@@ -1070,7 +1072,9 @@ var nlpOpen = false;
 function showNlp(){
   nlpOpen = true;
   document.getElementById('nlp').classList.add('sh');
-  renderNlpNow();  // bypass debounce — render immediately on open
+  // Use setTimeout(0) so the browser processes display:flex before we
+  // try to render into the panel — fixes blank panel on first open
+  setTimeout(function(){ if(nlpOpen) _doRenderNlp(); }, 0);
 }
 function hideNlp(){
   nlpOpen = false;
@@ -1110,14 +1114,6 @@ function getNlpFiltered(){
 }
 
 var nlpRenderTimer = null;
-
-function renderNlpNow(){
-  // Immediate render — used when opening panel for first time
-  clearTimeout(nlpRenderTimer);
-  nlpRenderTimer = null;
-  if(!nlpOpen) return;
-  _doRenderNlp();
-}
 
 function renderNlp(){
   // Debounced render — used during search typing (60ms)
