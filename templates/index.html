@@ -496,7 +496,7 @@ async function init(){
       '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
     return;
   }
-  showToast("📦 Server unavailable — some features limited");
+  if(!serverAvailable) showToast("📦 Server unavailable — some features limited");
 
   bootApp(namesData, state);
 }
