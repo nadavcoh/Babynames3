@@ -470,7 +470,7 @@ async function init(){
   document.getElementById("btn-lclose").onclick=hideLiked;
   document.getElementById("skip-si").oninput=function(){
     skipQ=this.value;
-    var clr=document.getElementById("skip-si-clr");
+    const clr=document.getElementById("skip-si-clr");
     if(clr) clr.classList.toggle("vis", this.value.length>0);
     renderSkipped();
   };
