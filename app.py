@@ -3,6 +3,7 @@
 
 import json, sqlite3, os, argparse, socket, sys, subprocess
 from flask import Flask, request, jsonify, render_template, g, send_from_directory
+from datetime import datetime
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "shem_tov.db")
@@ -280,7 +281,8 @@ if __name__ == "__main__":
     except socket.gaierror: local_ip = "?.?.?.?"
     scheme = "https" if args.cert else "http"
     print(f"\n  \u05E9\u05DD \u05D8\u05D5\u05D1  \u2014  Name Explorer  [{APP_VERSION}]")
-    print(f"  Local:    {scheme}://localhost:{args.port}")
-    print(f"  Network:  {scheme}://{local_ip}:{args.port}\n")
+    print(f"  Local:        {scheme}://localhost:{args.port}")
+    print(f"  Network:      {scheme}://{local_ip}:{args.port}")
+    print(f"  Current time: {datetime.now()}\n")
     ssl_ctx = (args.cert, args.key) if args.cert and args.key else None
     app.run(host=args.host, port=args.port, debug=args.debug, ssl_context=ssl_ctx)
