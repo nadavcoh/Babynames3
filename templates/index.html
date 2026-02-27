@@ -981,17 +981,27 @@ function removeLiked(nm){liked=liked.filter(function(n){return n!==nm});saveStat
 let SETTINGS = {};
 
 async function loadSettings(){
+  // Try cached settings first for instant feedback
   try{
-    const res = await fetch("/api/settings");
+    const cached = localStorage.getItem("cached-settings");
+    if(cached){ SETTINGS = JSON.parse(cached); applySettings(); buildDeck(); }
+  }catch(e){}
+  // Then fetch from server with a short timeout
+  if(!serverAvailable) return;
+  try{
+    const res = await fetchWithTimeout("/api/settings", {}, 3000);
+    if(!res.ok) throw new Error(res.status);
     SETTINGS = await res.json();
-  }catch(e){ SETTINGS = {}; }
-  applySettings();
-  buildDeck(); // rebuild deck with loaded settings
+    try{ localStorage.setItem("cached-settings", JSON.stringify(SETTINGS)); }catch(e){}
+    applySettings();
+    buildDeck();
+  }catch(e){ /* server unavailable — cached settings already applied */ }
 }
 
 async function saveSettings(){
   applySettings();
   buildDeck();
+  try{ localStorage.setItem("cached-settings", JSON.stringify(SETTINGS)); }catch(e){}
   try{
     await fetchWithTimeout("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(SETTINGS)});
   }catch(e){
@@ -1254,9 +1264,9 @@ function showDetailFromList(nm){
 // ═══ FINAL INIT — everything defined above, safe to call now ═══
 (async function(){
   await init();
-  await Promise.all([loadRatings(), loadSettings()]);
-  initSettings();
+  initSettings();        // wire all buttons immediately after bootApp
   updateOnlineStatus();
+  await Promise.all([loadRatings(), loadSettings()]);  // load data in background
   if(pendingSave && navigator.onLine) flushPending();
 
   // Periodic server re-check: retry every 30s when server was unavailable
