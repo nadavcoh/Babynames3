@@ -1091,13 +1091,18 @@ function getNlpFiltered(){
     return true;
   });
   var srt = q ? 'rk' : nlpSort;
-  if(srt === 'rk')      results.sort(function(a,b){ return (a.rk||9999)-(b.rk||9999); });
-  else if(srt==='r24')  results.sort(function(a,b){ return (a.r24||9999)-(b.r24||9999); });
-  else if(srt==='total') results.sort(function(a,b){ return b.t-a.t; });
-  else if(srt==='peak')  results.sort(function(a,b){ return b.p-a.p; });
-  else if(srt==='recent') results.sort(function(a,b){ return b.r-a.r; });
-  else if(srt==='az')    results.sort(function(a,b){ return a.h.localeCompare(b.h,'he'); });
-  else if(srt==='rand')  results.sort(function(){ return Math.random()-.5; });
+  const sortFunctions = {
+    'rk': (a, b) => (a.rk || 9999) - (b.rk || 9999),
+    'r24': (a, b) => (a.r24 || 9999) - (b.r24 || 9999),
+    'total': (a, b) => b.t - a.t,
+    'peak': (a, b) => b.p - a.p,
+    'recent': (a, b) => b.r - a.r,
+    'az': (a, b) => a.h.localeCompare(b.h, 'he'),
+    'rand': () => Math.random() - 0.5
+  };
+  if (sortFunctions[srt]) {
+    results.sort(sortFunctions[srt]);
+  }
   return results;
 }
 
