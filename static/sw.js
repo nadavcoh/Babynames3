@@ -1,7 +1,6 @@
-const CACHE = "shem-tov-v4";
+const CACHE = "shem-tov-v6";
 
 const PRECACHE = [
-  "/",
   "/static/manifest.json",
   "/static/names.json",
   "/static/icons/icon-192.png",
@@ -83,26 +82,13 @@ self.addEventListener("fetch", e => {
 
   if (e.request.mode === "navigate") {
     e.respondWith(
-      // 1. Try network
+      // Always try network first — HTML is never cached (changes with every deploy)
       fetch(e.request)
-        .then(res => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, copy));
-          }
-          return res;
-        })
         .catch(() =>
-          // 2. Network failed → try cache
-          caches.match(e.request)
-            .then(cached => cached || caches.match("/"))
-            .then(cached => {
-              if (cached) return cached;
-              // 3. Nothing in cache → embedded offline shell
-              return new Response(OFFLINE_HTML, {
-                headers: { "Content-Type": "text/html; charset=utf-8" }
-              });
-            })
+          // Network failed → embedded offline shell
+          new Response(OFFLINE_HTML, {
+            headers: { "Content-Type": "text/html; charset=utf-8" }
+          })
         )
     );
     return;

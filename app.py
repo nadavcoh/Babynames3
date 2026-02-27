@@ -286,7 +286,12 @@ if __name__ == "__main__":
     print(f"  Current time: {datetime.now()}\n")
     ssl_ctx = (args.cert, args.key) if args.cert and args.key else None
     # Ensure Ctrl+C works whether or not debug mode is on.
-    # Without this, Werkzeug's threaded server can swallow SIGINT.
+    # 1. Unblock SIGINT at the OS level (os.execv from a thread can inherit a blocked mask)
+    try:
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGINT})
+    except (AttributeError, OSError):
+        pass  # Not available on Windows
+    # 2. Restore the default Python handler (Flask/Werkzeug may have overridden it)
     signal.signal(signal.SIGINT, signal.default_int_handler)
     app.run(
         host=args.host,
