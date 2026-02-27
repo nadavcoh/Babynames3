@@ -297,6 +297,42 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <div id="toast"></div>
 
 <script>
+
+// ── Force old service-worker caches to clear immediately ──────────────────
+// If the browser has an old SW with cached HTML, this clears it so the
+// next navigation always fetches fresh HTML from the server.
+if ('caches' in window) {
+  caches.keys().then(function(names) {
+    names.forEach(function(name) {
+      if (name !== 'shem-tov-v6') {
+        caches.delete(name);
+      }
+    });
+  });
+}
+// Force the service worker to check for updates immediately
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistration('/').then(function(reg) {
+    if (reg) {
+      reg.update();
+      // If there's a waiting SW (new version ready), activate it now
+      if (reg.waiting) {
+        reg.waiting.postMessage({type: 'SKIP_WAITING'});
+      }
+      // Listen for new SW installing; when done, reload to get fresh page
+      reg.addEventListener('updatefound', function() {
+        var newSW = reg.installing;
+        newSW.addEventListener('statechange', function() {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // New SW ready — reload to get fresh HTML
+            window.location.reload();
+          }
+        });
+      });
+    }
+  });
+}
+
 const DAUGHTERS=new Set(["\u05D5\u05E8\u05D3","\u05D0\u05D1\u05D9\u05D2\u05D9\u05DC"]);
 const CC={vintage:{l:"\u2193 Vintage",co:"#9b2335"},modern:{l:"\u2191 Modern",co:"#2d6b45"},classic:{l:"\u2192 Classic",co:"#1a5c8a"},unisex:{l:"\u21C4 Unisex",co:"#5c3d8a"},all:{l:"All names",co:"#1a1208"}};
 const CBDG={vintage:"bv",modern:"bm",classic:"bc",unisex:"bu"};
