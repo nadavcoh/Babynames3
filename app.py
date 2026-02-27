@@ -62,7 +62,7 @@ def github_webhook():
                 f.write(
                     "@echo off\n"
                     "timeout /t 2 /nobreak >nul\n"
-                    f"start \"shem_tov\" {args}\n"
+                    f"{args}\n"
                 )
             subprocess.Popen(
                 ["cmd", "/c", bat],

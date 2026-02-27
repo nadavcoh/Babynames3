@@ -56,6 +56,13 @@ try{
 </html>`;
 
 // ── Install: cache app shell ─────────────────────────────────────────────────
+// Handle SKIP_WAITING message from page (force SW update)
+self.addEventListener("message", e => {
+  if (e.data && e.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("install", e => {
   e.waitUntil(
     caches.open(CACHE)
