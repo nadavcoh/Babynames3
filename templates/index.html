@@ -23,7 +23,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .btn-saved{background:var(--ink);color:var(--cr);border-radius:20px;padding:5px 13px;font-size:.78rem;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:transform .15s}
 .btn-saved:hover{transform:scale(1.05)}
 .sw{padding:10px 16px 4px;position:relative}
-.si{width:100%;padding:9px 14px 9px 36px;border-radius:22px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--ink);outline:none;transition:border-color .2s}
+.si{width:100%;padding:9px 32px 9px 36px;border-radius:22px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--ink);outline:none;transition:border-color .2s}
 .si:focus{border-color:var(--gd)}
 .si-ico{position:absolute;left:25px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none}
 .sm{font-size:.7rem;color:var(--mu);padding:3px 17px 0}
@@ -98,7 +98,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .nlp-title{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700}
 .nlp-ctrl{padding:10px 14px 6px;background:var(--cr);flex-shrink:0;border-bottom:1px solid #e8e2da}
 .nlp-search{position:relative;margin-bottom:8px}
-.nlp-si{width:100%;padding:9px 14px 9px 36px;border-radius:22px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--ink);outline:none;transition:border-color .2s}
+.nlp-si{width:100%;padding:9px 32px 9px 36px;border-radius:22px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--ink);outline:none;transition:border-color .2s}
 .nlp-si:focus{border-color:var(--gd)}
 .nlp-si-ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none;font-size:.9rem}
 .nlp-filters{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
@@ -119,8 +119,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .nlp-empty{padding:40px 20px;text-align:center;color:var(--mu);font-size:.88rem}
 
 .sk-ico{position:absolute;left:24px;top:50%;transform:translateY(-50%);color:var(--mu);pointer-events:none;font-size:.85rem}
-.sk-si{width:100%;padding:8px 12px 8px 32px;border-radius:20px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.82rem;outline:none}
+.sk-si{width:100%;padding:8px 32px 8px 32px;border-radius:20px;border:1.5px solid #d8d0c6;background:white;font-family:'DM Sans',sans-serif;font-size:.82rem;outline:none}
 .sk-si:focus{border-color:var(--gd)}
+.si-clr{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:20px;height:20px;background:none;border:none;cursor:pointer;color:var(--mu);font-size:.72rem;padding:0;border-radius:50%;display:none;align-items:center;justify-content:center;line-height:1;flex-shrink:0}
+.si-clr.vis{display:flex}
+.si-clr:hover{color:var(--ink)}
 /* ── Skipped name row ── */
 .ski{display:flex;align-items:center;justify-content:space-between;gap:10px;background:white;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06);padding:11px 14px}
 .ski-l{min-width:0}
@@ -1067,7 +1070,7 @@ var nlpOpen = false;
 function showNlp(){
   nlpOpen = true;
   document.getElementById('nlp').classList.add('sh');
-  renderNlp();
+  renderNlpNow();  // bypass debounce — render immediately on open
 }
 function hideNlp(){
   nlpOpen = false;
@@ -1107,10 +1110,25 @@ function getNlpFiltered(){
 }
 
 var nlpRenderTimer = null;
+
+function renderNlpNow(){
+  // Immediate render — used when opening panel for first time
+  clearTimeout(nlpRenderTimer);
+  nlpRenderTimer = null;
+  if(!nlpOpen) return;
+  _doRenderNlp();
+}
+
 function renderNlp(){
+  // Debounced render — used during search typing (60ms)
   if(!nlpOpen) return;
   clearTimeout(nlpRenderTimer);
   nlpRenderTimer = setTimeout(function(){
+    _doRenderNlp();
+  }, 60);
+}
+
+function _doRenderNlp(){
     var names = getNlpFiltered();
     var likedSet = new Set(liked.map(function(n){ return n.h; }));
     var skippedSet = skipped;
@@ -1167,7 +1185,6 @@ function renderNlp(){
       }
     }
     renderChunk();
-  }, 60);
 }
 
 // showDetail variant that shows correct buttons depending on context
