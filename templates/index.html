@@ -467,7 +467,7 @@ async function init(){
     }
 
     if(namesData && state){
-      bootApp(namesData, state);
+      try{ bootApp(namesData, state); }catch(e){ console.error("bootApp (cache) failed:", e); }
       syncFromServer();  // fire-and-forget — init() returns immediately
       return;
     }
@@ -494,7 +494,7 @@ async function init(){
   }
   if(!serverAvailable) showToast("📦 Loaded from cache — server unavailable");
 
-  bootApp(namesData, state);
+  try{ bootApp(namesData, state); }catch(e){ console.error("bootApp (network) failed:", e); }
 }
 function bootApp(namesData, state){
   RAW = namesData;
@@ -551,6 +551,7 @@ function bootApp(namesData, state){
     var inp=document.getElementById("si");
     inp.value=""; q=""; this.classList.remove("vis"); buildDeck();
   };
+  initSettings();  // wire btn-settings NOW, before anything that might throw
   updateCounter();
   buildDeck();
   if(liked.length>0||skipped.size>0){
@@ -1264,7 +1265,6 @@ function showDetailFromList(nm){
 // ═══ FINAL INIT — everything defined above, safe to call now ═══
 (async function(){
   await init();
-  initSettings();        // wire all buttons immediately after bootApp
   updateOnlineStatus();
   await Promise.all([loadRatings(), loadSettings()]);  // load data in background
   if(pendingSave && navigator.onLine) flushPending();
