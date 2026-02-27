@@ -438,7 +438,46 @@ async function fetchWithCache(url, cacheKey){
 }
 
 async function init(){
-  // Quick server probe before parallel fetches — single timeout point
+  const cachedNames = localStorage.getItem("cached-names");
+  const cachedState = localStorage.getItem("local-state");
+
+  if(cachedNames && cachedState){
+    // ── Cache-first: show app instantly, sync server in background ──
+    let namesData, state;
+    try{
+      namesData = JSON.parse(cachedNames);
+      state     = JSON.parse(cachedState);
+    }catch(e){
+      namesData = null; state = null;
+    }
+
+    if(namesData && state){
+      // Boot immediately from cache
+      bootApp(namesData, state);
+
+      // Try server in background with short timeout
+      try{
+        const r = await fetchWithTimeout("/api/state", {method:"HEAD"}, 2000);
+        setServerAvailable(true);
+        // Server is up — refresh state silently (names rarely change)
+        const freshState = await fetchWithTimeout("/api/state", {}, 4000);
+        if(freshState.ok){
+          const s = await freshState.json();
+          const nameMap = {};
+          RAW.forEach(function(n){ nameMap[n.h] = n; });
+          liked   = (s.liked   || []).map(function(h){ return nameMap[h]; }).filter(Boolean);
+          skipped = new Set(s.skipped || []);
+          updateCounter();
+          buildDeck();
+        }
+      }catch(e){
+        setServerAvailable(false);
+      }
+      return;
+    }
+  }
+
+  // ── No cache: must wait for server ──
   try{
     await fetchWithTimeout("/api/state", {method:"HEAD"}, 4000);
     setServerAvailable(true);
@@ -457,8 +496,12 @@ async function init(){
       '<div style="padding:32px;text-align:center;color:#9b2335">⚠️ ' + e.message + '</div>';
     return;
   }
-  if(!serverAvailable) showToast("📦 Loaded from cache (server unavailable)");
+  showToast("📦 Server unavailable — some features limited");
 
+  bootApp(namesData, state);
+}
+
+function bootApp(namesData, state){
   RAW = namesData;
   const nameMap = {};
   RAW.forEach(function(n){ nameMap[n.h] = n; });
@@ -518,7 +561,7 @@ async function init(){
   if(liked.length>0||skipped.size>0){
     showToast("\u2665 Restored: "+liked.length+" saved, "+skipped.size+" skipped");
   }
-}
+}  // end bootApp
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function buildTabs(){
@@ -1067,6 +1110,7 @@ function initSettings(){
 // ══ BROWSE ALL NAMES LIST PANEL ══════════════════════════════════════
 var nlpQ = '';
 var nlpCat = 'all';
+var nlpSort = 'rk';
 var nlpOpen = false;
 
 function showNlp(){
