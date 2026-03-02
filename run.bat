@@ -13,4 +13,5 @@ rem
 if exist venv\Scripts\activate.bat (
     call venv\Scripts\activate.bat
 )
+title babynames3
 python app.py %*
