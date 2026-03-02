@@ -295,6 +295,121 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 </div>
 <div id="offline-ind" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:500;background:#1a1208;color:#f7f3ee;font-size:.78rem;font-weight:600;padding:8px 16px;align-items:center;justify-content:center;gap:8px;"></div>
 <div id="toast"></div>
+<div class="sp" id="settingsPanel">
+  <div class="sp-h">
+    <div class="sp-title">&#9881;&#65039; Settings</div>
+    <button class="pcl" id="btn-sp-close">&#x2715;</button>
+  </div>
+  <div class="sp-body">
+
+    <div class="sp-section">
+      <div class="sp-section-title">Progress</div>
+      <div class="sp-stats" id="sp-stats">
+        <div class="sp-stat"><div class="n" id="stat-liked">0</div><div class="l">Saved</div></div>
+        <div class="sp-stat"><div class="n" id="stat-skipped" style="color:var(--ro)">0</div><div class="l">Skipped</div></div>
+        <div class="sp-stat"><div class="n" id="stat-remain" style="color:var(--sk)">0</div><div class="l">Remaining</div></div>
+      </div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Filter categories</div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">&#8595; Vintage names</div><div class="sp-sub">Peaked before 2000, rarely given now</div></div>
+        <label class="tog"><input type="checkbox" id="s-vintage" checked><span class="tog-sl"></span></label>
+      </div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">&#8593; Modern names</div><div class="sp-sub">Surged after 2005, still popular</div></div>
+        <label class="tog"><input type="checkbox" id="s-modern" checked><span class="tog-sl"></span></label>
+      </div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">&#8594; Classic names</div><div class="sp-sub">Consistent across generations</div></div>
+        <label class="tog"><input type="checkbox" id="s-classic" checked><span class="tog-sl"></span></label>
+      </div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">&#8644; Unisex names</div><div class="sp-sub">Also given to boys</div></div>
+        <label class="tog"><input type="checkbox" id="s-unisex" checked><span class="tog-sl"></span></label>
+      </div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Display</div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">Minimum popularity</div><div class="sp-sub">Hide names with fewer total bearers</div></div>
+        <select class="sp-sel" id="s-minTotal">
+          <option value="20">20+ bearers</option>
+          <option value="100">100+ bearers</option>
+          <option value="500">500+ bearers</option>
+          <option value="1000">1,000+ bearers</option>
+          <option value="5000">5,000+ bearers</option>
+        </select>
+      </div>
+      <div class="sp-row">
+        <div><div class="sp-lbl">Highlight your daughters</div><div class="sp-sub">Mark &#1493;&#1512;&#1491; &amp; &#1488;&#1489;&#1497;&#1490;&#1497;&#1500; with &#9733;</div></div>
+        <label class="tog"><input type="checkbox" id="s-daughters" checked><span class="tog-sl"></span></label>
+      </div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Danger zone</div>
+      <div class="sp-danger">
+        <button class="sp-danger-btn" id="sp-clear-skipped" style="background:#e8f3ec;color:var(--sg)">Re-show skipped</button>
+        <button class="sp-danger-btn" id="sp-clear-all"     style="background:var(--rol);color:var(--ro)">Clear everything</button>
+      </div>
+    </div>
+
+    <div class="sp-section">
+      <div class="sp-section-title">Server</div>
+      <div style="padding:14px 18px">
+        <button class="sp-danger-btn" id="btn-deploy" style="width:100%;background:var(--skl);color:var(--sk)">
+          &#8645; Deploy latest update
+        </button>
+        <div id="deploy-status" style="font-size:.7rem;color:var(--mu);margin-top:8px;min-height:1.2em;text-align:center"></div>
+      </div>
+    </div>
+
+    <div style="padding:14px 18px 4px;font-size:.68rem;color:var(--mu)">
+      <div id="pwa-status" style="margin-bottom:4px"></div>
+      <div>Version: <span id="app-version">—</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Browse All Names panel ── -->
+<div class="nlp" id="nlp">
+  <div class="nlp-head">
+    <div class="nlp-title">&#128220; All names</div>
+    <button class="pcl" id="btn-nlp-close">&#x2715;</button>
+  </div>
+  <div class="nlp-ctrl">
+    <div class="nlp-search">
+      <span class="nlp-si-ico">&#128269;</span>
+      <input class="nlp-si" id="nlp-si" placeholder="Search names…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="si-clr" id="nlp-si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button>
+    </div>
+    <div class="nlp-sort-wrap">
+      <span class="nlp-sort-lbl">Sort:</span>
+      <select class="nlp-sort-sel" id="nlp-sort">
+        <option value="rk">Overall rank</option>
+        <option value="r24">2024 rank</option>
+        <option value="total">All-time total</option>
+        <option value="peak">Peak year</option>
+        <option value="recent">Most recent</option>
+        <option value="az">A&#x2013;Z</option>
+        <option value="rand">Random</option>
+      </select>
+      <span class="nlp-count" id="nlp-count"></span>
+    </div>
+    <div class="nlp-filters">
+      <button class="sb on" id="nlp-cat-all"   onclick="setNlpCat('all')">All</button>
+      <button class="sb"    id="nlp-cat-vintage" onclick="setNlpCat('vintage')">&#8595; Vintage</button>
+      <button class="sb"    id="nlp-cat-modern"  onclick="setNlpCat('modern')">&#8593; Modern</button>
+      <button class="sb"    id="nlp-cat-classic" onclick="setNlpCat('classic')">&#8594; Classic</button>
+      <button class="sb"    id="nlp-cat-unisex"  onclick="setNlpCat('unisex')">&#8644; Unisex</button>
+    </div>
+  </div>
+  <div class="nlp-body" id="nlp-body"></div>
+</div>
 
 <script>
 
@@ -1352,122 +1467,5 @@ function showDetailFromList(nm){
 })();
 
 </script>
-
-<div class="sp" id="settingsPanel">
-  <div class="sp-h">
-    <div class="sp-title">&#9881;&#65039; Settings</div>
-    <button class="pcl" id="btn-sp-close">&#x2715;</button>
-  </div>
-  <div class="sp-body">
-
-    <div class="sp-section">
-      <div class="sp-section-title">Progress</div>
-      <div class="sp-stats" id="sp-stats">
-        <div class="sp-stat"><div class="n" id="stat-liked">0</div><div class="l">Saved</div></div>
-        <div class="sp-stat"><div class="n" id="stat-skipped" style="color:var(--ro)">0</div><div class="l">Skipped</div></div>
-        <div class="sp-stat"><div class="n" id="stat-remain" style="color:var(--sk)">0</div><div class="l">Remaining</div></div>
-      </div>
-    </div>
-
-    <div class="sp-section">
-      <div class="sp-section-title">Filter categories</div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">&#8595; Vintage names</div><div class="sp-sub">Peaked before 2000, rarely given now</div></div>
-        <label class="tog"><input type="checkbox" id="s-vintage" checked><span class="tog-sl"></span></label>
-      </div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">&#8593; Modern names</div><div class="sp-sub">Surged after 2005, still popular</div></div>
-        <label class="tog"><input type="checkbox" id="s-modern" checked><span class="tog-sl"></span></label>
-      </div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">&#8594; Classic names</div><div class="sp-sub">Consistent across generations</div></div>
-        <label class="tog"><input type="checkbox" id="s-classic" checked><span class="tog-sl"></span></label>
-      </div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">&#8644; Unisex names</div><div class="sp-sub">Also given to boys</div></div>
-        <label class="tog"><input type="checkbox" id="s-unisex" checked><span class="tog-sl"></span></label>
-      </div>
-    </div>
-
-    <div class="sp-section">
-      <div class="sp-section-title">Display</div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">Minimum popularity</div><div class="sp-sub">Hide names with fewer total bearers</div></div>
-        <select class="sp-sel" id="s-minTotal">
-          <option value="20">20+ bearers</option>
-          <option value="100">100+ bearers</option>
-          <option value="500">500+ bearers</option>
-          <option value="1000">1,000+ bearers</option>
-          <option value="5000">5,000+ bearers</option>
-        </select>
-      </div>
-      <div class="sp-row">
-        <div><div class="sp-lbl">Highlight your daughters</div><div class="sp-sub">Mark &#1493;&#1512;&#1491; &amp; &#1488;&#1489;&#1497;&#1490;&#1497;&#1500; with &#9733;</div></div>
-        <label class="tog"><input type="checkbox" id="s-daughters" checked><span class="tog-sl"></span></label>
-      </div>
-    </div>
-
-    <div class="sp-section">
-      <div class="sp-section-title">Danger zone</div>
-      <div class="sp-danger">
-        <button class="sp-danger-btn" id="sp-clear-skipped" style="background:#e8f3ec;color:var(--sg)">Re-show skipped</button>
-        <button class="sp-danger-btn" id="sp-clear-all"     style="background:var(--rol);color:var(--ro)">Clear everything</button>
-      </div>
-    </div>
-
-    <div class="sp-section">
-      <div class="sp-section-title">Server</div>
-      <div style="padding:14px 18px">
-        <button class="sp-danger-btn" id="btn-deploy" style="width:100%;background:var(--skl);color:var(--sk)">
-          &#8645; Deploy latest update
-        </button>
-        <div id="deploy-status" style="font-size:.7rem;color:var(--mu);margin-top:8px;min-height:1.2em;text-align:center"></div>
-      </div>
-    </div>
-
-    <div style="padding:14px 18px 4px;font-size:.68rem;color:var(--mu)">
-      <div id="pwa-status" style="margin-bottom:4px"></div>
-      <div>Version: <span id="app-version">—</span></div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ── Browse All Names panel ── -->
-<div class="nlp" id="nlp">
-  <div class="nlp-head">
-    <div class="nlp-title">&#128220; All names</div>
-    <button class="pcl" id="btn-nlp-close">&#x2715;</button>
-  </div>
-  <div class="nlp-ctrl">
-    <div class="nlp-search">
-      <span class="nlp-si-ico">&#128269;</span>
-      <input class="nlp-si" id="nlp-si" placeholder="Search names…" autocomplete="off" autocorrect="off" spellcheck="false">
-      <button class="si-clr" id="nlp-si-clr" tabindex="-1" aria-label="Clear">&#x2715;</button>
-    </div>
-    <div class="nlp-sort-wrap">
-      <span class="nlp-sort-lbl">Sort:</span>
-      <select class="nlp-sort-sel" id="nlp-sort">
-        <option value="rk">Overall rank</option>
-        <option value="r24">2024 rank</option>
-        <option value="total">All-time total</option>
-        <option value="peak">Peak year</option>
-        <option value="recent">Most recent</option>
-        <option value="az">A&#x2013;Z</option>
-        <option value="rand">Random</option>
-      </select>
-      <span class="nlp-count" id="nlp-count"></span>
-    </div>
-    <div class="nlp-filters">
-      <button class="sb on" id="nlp-cat-all"   onclick="setNlpCat('all')">All</button>
-      <button class="sb"    id="nlp-cat-vintage" onclick="setNlpCat('vintage')">&#8595; Vintage</button>
-      <button class="sb"    id="nlp-cat-modern"  onclick="setNlpCat('modern')">&#8593; Modern</button>
-      <button class="sb"    id="nlp-cat-classic" onclick="setNlpCat('classic')">&#8594; Classic</button>
-      <button class="sb"    id="nlp-cat-unisex"  onclick="setNlpCat('unisex')">&#8644; Unisex</button>
-    </div>
-  </div>
-  <div class="nlp-body" id="nlp-body"></div>
-</div>
-
 </body>
 </html>
