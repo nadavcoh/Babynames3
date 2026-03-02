@@ -63,6 +63,7 @@ def github_webhook():
                     "@echo off\n"
                     "timeout /t 2 /nobreak >nul\n"
                     f"{args}\n"
+                    "pause\n"
                 )
             subprocess.Popen(
                 ["cmd", "/c", bat],
