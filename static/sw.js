@@ -1,6 +1,7 @@
-const CACHE = "shem-tov-v6";
+const CACHE = "shem-tov-v7";
 
 const PRECACHE = [
+  "/",
   "/static/manifest.json",
   "/static/names.json",
   "/static/icons/icon-192.png",
