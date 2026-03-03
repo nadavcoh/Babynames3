@@ -61,7 +61,9 @@ def github_webhook():
             with open(bat, "w") as f:
                 f.write(
                     "@echo off\n"
+                    "pause\n"
                     "timeout /t 2 /nobreak >nul\n"
+                    "pause\n"
                     f"cd /d \"{app_dir}\"\n"
                     "pause\n"
                     f"{args}\n"
