@@ -82,7 +82,7 @@ def github_webhook():
                 python = sys.executable
             os.execv(python, [python, os.path.join(app_dir, "app.py")] + sys.argv[1:])
 
-    threading.Thread(target=do_deploy, daemon=True).start()
+    threading.Thread(target=do_deploy, daemon=False).start()
     return jsonify({"ok": True, "action": "deploying"})
  
 # ─── DATABASE FUNCTIONS ───
