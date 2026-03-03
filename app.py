@@ -62,6 +62,8 @@ def github_webhook():
                 f.write(
                     "@echo off\n"
                     "timeout /t 2 /nobreak >nul\n"
+                    f"cd /d \"{app_dir}\"\n"
+                    "pause\n"
                     f"{args}\n"
                     "pause\n"
                 )
